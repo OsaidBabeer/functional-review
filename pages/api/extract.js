@@ -1,7 +1,8 @@
 // pages/api/extract.js
-// Text-paste path — kept for quick manual testing. Real usage goes through
-// /api/upload-pptx now.
-import { extractOneFunction } from '../../lib/extractFunction';
+// Now takes the FULL document text (all slides joined) and can return
+// multiple saved submissions from one call, since one file might contain
+// one function (spread across slides) or several.
+import { extractFunctionsFromDocument } from '../../lib/extractFunction';
 import { saveSubmission } from '../../lib/saveSubmission';
 
 export default async function handler(req, res) {
@@ -13,12 +14,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const extracted = await extractOneFunction(raw_text);
-    if (extracted.skip) {
-      return res.status(200).json({ skipped: true, reason: 'Not a function submission' });
+    const extractedList = await extractFunctionsFromDocument(raw_text);
+    const saved = [];
+    for (const extracted of extractedList) {
+      const result = await saveSubmission(extracted, raw_text, source_filename);
+      saved.push(result);
     }
-    const saved = await saveSubmission(extracted, raw_text, source_filename);
-    return res.status(200).json({ success: true, submission: saved });
+    return res.status(200).json({ success: true, count: saved.length, submissions: saved });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
