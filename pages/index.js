@@ -17,7 +17,7 @@ const WELCOME = {
 };
 
 export default function Home() {
-  const [tab, setTab] = useState('review'); // 'review' | 'structure' | 'help'
+  const [tab, setTab] = useState('help'); // 'help' | 'review' | 'structure'
 
   return (
     <>
@@ -38,15 +38,15 @@ export default function Home() {
             </div>
           </div>
           <nav style={s.tabRow}>
+            <TabButton active={tab === 'help'} onClick={() => setTab('help')}>How It Works</TabButton>
             <TabButton active={tab === 'review'} onClick={() => setTab('review')}>Function Review</TabButton>
             <TabButton active={tab === 'structure'} onClick={() => setTab('structure')}>Structure</TabButton>
-            <TabButton active={tab === 'help'} onClick={() => setTab('help')}>How It Works</TabButton>
           </nav>
         </header>
 
+        {tab === 'help' && <HelpTab />}
         {tab === 'review' && <ReviewTab />}
         {tab === 'structure' && <StructureTab />}
-        {tab === 'help' && <HelpTab />}
       </div>
     </>
   );
@@ -211,23 +211,32 @@ function StructureTab() {
   return (
     <div style={s.structureArea}>
       <div style={s.structureIntro}>
-        Approved structure — CEO at the top, each division below with its departments.
-        Tell the agent about a real change in the Function Review tab and it updates here automatically.
+        Approved structure, live. Tell the agent about a real change in the Function Review tab
+        and this chart updates automatically — no manual redraw.
       </div>
       {loading && <div style={{ color: olive, padding: 20 }}>Loading…</div>}
-      <div style={s.ceoNode}>CEO</div>
-      <div style={s.divisionGrid}>
-        {(tree || []).map((division) => (
-          <div key={division.id} style={s.divisionCard}>
-            <div style={s.divisionHeader}>{division.name}</div>
-            <div style={s.deptList}>
-              {division.children.length === 0 && <div style={s.deptEmpty}>—</div>}
-              {division.children.map((d) => (
-                <div key={d.id} style={s.deptChip}>{d.name}</div>
-              ))}
+
+      <div style={s.orgChart}>
+        <div style={s.ceoNode}>CEO</div>
+        <div style={s.stemDown} />
+        <div style={s.divisionsRow}>
+          {(tree || []).map((division) => (
+            <div key={division.id} style={s.divisionCol}>
+              <div style={s.stemSmall} />
+              <div style={s.divisionBox}>{division.name}</div>
+              {division.children.length > 0 && (
+                <>
+                  <div style={s.stemSmall} />
+                  <div style={s.deptStack}>
+                    {division.children.map((d) => (
+                      <div key={d.id} style={s.deptBox}>{d.name}</div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -237,18 +246,68 @@ function StructureTab() {
 function HelpTab() {
   return (
     <div style={s.helpArea}>
-      <h2 style={s.helpH2}>How this works</h2>
-      <ol style={s.helpList}>
-        <li><strong>Upload a submission.</strong> Drop in the filled-out functional review pptx — one slide per function/department. Every slide gets read and turned into structured data automatically.</li>
-        <li><strong>It cross-checks everything.</strong> Every time you ask a question, the agent re-reads all uploaded functions together, plus BDC's approved structure and its heritage/contractor-managed operating model, plus any rules you or Ezwah have taught it.</li>
-        <li><strong>Ask anything.</strong> "Where are the overlaps?", "compare Marketing and Communications", or click Run Full Review for the complete report — overlaps, gaps, ownership ambiguity, and structure mismatches.</li>
-        <li><strong>Tell it about real changes.</strong> Say something like "HR moved from Shared Services to a new COO division" and it updates the Structure tab for real — not just in the chat.</li>
-        <li><strong>Nothing is forgotten.</strong> The conversation is saved — closing the tab and coming back later picks up right where you left off.</li>
-      </ol>
+      <h2 style={s.helpH2}>What this does</h2>
+      <p style={s.helpLead}>
+        You upload what every sector submitted. It reads all of it at once, against BDC's actual
+        structure and how BDC actually operates, and tells you where two functions are fighting
+        over the same ground — or where something has no owner at all.
+      </p>
+
+      <div style={s.helpStep}>
+        <div style={s.helpStepNum}>01</div>
+        <div>
+          <div style={s.helpStepTitle}>Upload the submission</div>
+          <div style={s.helpStepBody}>
+            Drop in the pptx as-is — one slide per sector. It splits every slide apart and reads
+            each one on its own, so a 20-slide file becomes 20 separate function records, not one
+            blur of text.
+          </div>
+        </div>
+      </div>
+
+      <div style={s.helpStep}>
+        <div style={s.helpStepNum}>02</div>
+        <div>
+          <div style={s.helpStepTitle}>Ask it to find the real problems</div>
+          <div style={s.helpStepBody}>
+            Example that actually happened in your data: Operations Excellence listed "Risk
+            Management" and "Audit engagement" as things it owns — but the approved structure
+            already places Risk Management under GRC and Audit under Internal Audit. Ask
+            <em> "where are the overlaps?"</em> and it catches exactly that, names both functions,
+            and quotes the colliding line from each.
+          </div>
+        </div>
+      </div>
+
+      <div style={s.helpStep}>
+        <div style={s.helpStepNum}>03</div>
+        <div>
+          <div style={s.helpStepTitle}>Tell it what actually changed</div>
+          <div style={s.helpStepBody}>
+            Say <em>"HR is moving from Shared Services to a new COO division reporting directly
+            to CEO"</em> — it doesn't just acknowledge that in the chat, it writes the change to
+            the real structure. Switch to the Structure tab and HR is already gone from Shared
+            Services and sitting under COO.
+          </div>
+        </div>
+      </div>
+
+      <div style={s.helpStep}>
+        <div style={s.helpStepNum}>04</div>
+        <div>
+          <div style={s.helpStepTitle}>Correct it, and it stays corrected</div>
+          <div style={s.helpStepBody}>
+            If it flags something that's actually fine — say Marketing owning project-level
+            social media while Communications owns corporate channels is an intentional split —
+            tell it that. It won't just drop it for this conversation; ask it to remember the
+            rule and every future review respects that boundary automatically.
+          </div>
+        </div>
+      </div>
+
       <p style={s.helpNote}>
-        Built by Osaid and Ezwah. The agent's judgment gets sharper the more you correct it in
-        conversation — tell it when something it flagged is actually fine, or when a rule should
-        always apply, and it factors that into every future review.
+        Nothing here is forgotten between visits — close the tab, come back next week, the
+        conversation and everything you've taught it is still there.
       </p>
     </div>
   );
@@ -282,18 +341,25 @@ const s = {
   input: { flex: 1, padding: '13px 16px', borderRadius: 7, border: `1px solid ${line}`, fontSize: 14.5, outline: 'none', fontFamily: "'Inter', sans-serif", background: parch },
   sendBtn: { background: ink, color: '#fff', border: 'none', borderRadius: 7, padding: '0 26px', fontSize: 14.5, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
 
-  structureArea: { flex: 1, overflowY: 'auto', padding: '24px 28px' },
-  structureIntro: { fontSize: 13, color: olive, marginBottom: 20, maxWidth: 560, lineHeight: 1.5 },
-  ceoNode: { width: 120, margin: '0 auto 20px', textAlign: 'center', background: brick, color: '#fff', fontFamily: "'Fraunces', serif", fontWeight: 600, padding: '10px 0', borderRadius: 6, fontSize: 15 },
-  divisionGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 },
-  divisionCard: { background: '#fff', border: `1px solid ${line}`, borderRadius: 8, overflow: 'hidden' },
-  divisionHeader: { background: olive, color: '#fff', padding: '9px 12px', fontSize: 13.5, fontWeight: 600 },
-  deptList: { padding: 10, display: 'flex', flexWrap: 'wrap', gap: 6 },
-  deptChip: { background: parch, border: `1px solid ${line}`, borderRadius: 5, padding: '4px 9px', fontSize: 12 },
-  deptEmpty: { color: '#bbb', fontSize: 12 },
+  structureArea: { flex: 1, overflowY: 'auto', overflowX: 'auto', padding: '28px' },
+  structureIntro: { fontSize: 13, color: olive, marginBottom: 28, maxWidth: 560, lineHeight: 1.5 },
 
-  helpArea: { flex: 1, overflowY: 'auto', padding: '28px', maxWidth: 640 },
-  helpH2: { fontFamily: "'Fraunces', serif", fontSize: 21, marginBottom: 14 },
-  helpList: { paddingLeft: 20, lineHeight: 1.8, fontSize: 14.5 },
-  helpNote: { marginTop: 20, fontSize: 13, color: olive, lineHeight: 1.6 },
+  orgChart: { display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 'fit-content' },
+  ceoNode: { background: brick, color: '#fff', fontFamily: "'Fraunces', serif", fontWeight: 600, padding: '10px 26px', borderRadius: 6, fontSize: 15 },
+  stemDown: { width: 2, height: 22, background: line },
+  divisionsRow: { display: 'flex', gap: 22, borderTop: `2px solid ${line}`, paddingTop: 0, width: 'fit-content' },
+  divisionCol: { display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' },
+  divisionBox: { background: olive, color: '#fff', fontSize: 13, fontWeight: 600, padding: '9px 14px', borderRadius: 6, whiteSpace: 'nowrap' },
+  stemSmall: { width: 2, height: 16, background: line },
+  deptStack: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch' },
+  deptBox: { background: '#fff', border: `1px solid ${line}`, borderRadius: 5, padding: '6px 12px', fontSize: 12, whiteSpace: 'nowrap', textAlign: 'center' },
+
+  helpArea: { flex: 1, overflowY: 'auto', padding: '32px 28px', maxWidth: 660 },
+  helpH2: { fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 10 },
+  helpLead: { fontSize: 15, lineHeight: 1.65, color: ink, marginBottom: 28 },
+  helpStep: { display: 'flex', gap: 16, marginBottom: 22 },
+  helpStepNum: { fontFamily: "'Fraunces', serif", fontSize: 22, color: line, fontWeight: 600, flexShrink: 0, width: 32 },
+  helpStepTitle: { fontSize: 15, fontWeight: 600, marginBottom: 5, color: brick },
+  helpStepBody: { fontSize: 13.5, lineHeight: 1.65, color: ink },
+  helpNote: { marginTop: 26, fontSize: 13, color: olive, lineHeight: 1.6, borderTop: `1px solid ${line}`, paddingTop: 16 },
 };
