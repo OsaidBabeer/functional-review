@@ -5,28 +5,48 @@ import Head from 'next/head';
 const APP_NAME = 'BDC Functional Review';
 const APP_SUBTITLE = 'Organizational Design Review Agent';
 
+const WELCOME = {
+  role: 'assistant',
+  content:
+    "I've reviewed org designs for a long time. Upload a functional review submission and I'll read every function — then ask me about overlaps, gaps, ownership conflicts, or ask for a full review.",
+};
+
 export default function Home() {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content:
-        "I've reviewed org designs for a long time. Upload a functional review submission and I'll read every function — then ask me about overlaps, gaps, ownership conflicts, or ask for a full review.",
-    },
-  ]);
+  const [messages, setMessages] = useState([WELCOME]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
+
+  // Restore the saved conversation when the page opens.
+  useEffect(() => {
+    fetch('/api/chat-history')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.messages && data.messages.length > 0) {
+          setMessages(data.messages);
+        }
+        setHistoryLoaded(true);
+      })
+      .catch(() => setHistoryLoaded(true));
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sending]);
 
-  async function handleSend() {
-    if (!input.trim() || sending) return;
-    const newMessages = [...messages, { role: 'user', content: input }];
+  function runFullReview() {
+    sendMessage(
+      'Give me a full review of every function currently loaded: overlaps, gaps, ownership ambiguities, and structure issues.'
+    );
+  }
+
+  async function sendMessage(text) {
+    if (!text.trim() || sending) return;
+    const newMessages = [...messages, { role: 'user', content: text }];
     setMessages(newMessages);
     setInput('');
     setSending(true);
@@ -42,6 +62,10 @@ export default function Home() {
       setMessages([...newMessages, { role: 'assistant', content: 'Error: ' + err.message }]);
     }
     setSending(false);
+  }
+
+  function handleSend() {
+    sendMessage(input);
   }
 
   async function handleUpload(e) {
@@ -130,6 +154,12 @@ export default function Home() {
               </div>
             </div>
           )}
+        </div>
+
+        <div style={s.quickRow}>
+          <button style={s.quickBtn} onClick={runFullReview} disabled={sending}>
+            Run Full Review
+          </button>
         </div>
 
         <div style={s.inputRow}>
@@ -259,6 +289,18 @@ const s = {
     lineHeight: 1.6,
   },
   thinking: { color: olive, fontStyle: 'italic', fontFamily: "'Fraunces', serif" },
+  quickRow: { padding: '10px 28px 0', background: '#fff' },
+  quickBtn: {
+    background: 'transparent',
+    color: olive,
+    border: `1px solid ${olive}`,
+    borderRadius: 6,
+    padding: '7px 14px',
+    fontSize: 12.5,
+    fontWeight: 500,
+    cursor: 'pointer',
+    fontFamily: "'Inter', sans-serif",
+  },
   inputRow: {
     display: 'flex',
     gap: 10,
