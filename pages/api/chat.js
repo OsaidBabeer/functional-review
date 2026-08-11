@@ -1,13 +1,19 @@
 // pages/api/chat.js
 //
-// The OD expert agent, now with two additions:
-// 1. It reads the APPROVED ORG STRUCTURE, not just general company identity.
-// 2. Every message (yours and its replies) gets saved to Supabase, so the
-//    conversation survives refreshes and is there next time you open the app.
+// Now includes the tool-use loop:
+// 1. We send Claude the conversation + the update_org_structure tool definition.
+// 2. If Claude's reply contains a tool_use block, it means it decided a real
+//    structural change was described. We execute it against the database
+//    (structureTools.js), then send the result BACK to Claude as a
+//    tool_result, and ask it to continue — that's when it writes the actual
+//    reply you see, now knowing whether the change succeeded.
+// 3. If there's no tool_use, it just replies normally — most messages won't
+//    trigger the tool at all.
 
 import { supabase } from '../../lib/supabase';
 import { COMPANY_CONTEXT } from '../../lib/companyContext';
-import { ORG_STRUCTURE } from '../../lib/orgStructure';
+import { getStructureTree, structureToText } from '../../lib/structure';
+import { executeStructureTool, STRUCTURE_TOOL_DEFINITION } from '../../lib/structureTools';
 
 function formatSubmissions(subs) {
   if (!subs.length) return '(No function submissions uploaded yet.)';
@@ -27,10 +33,29 @@ KPIs: ${(s.kpis || []).join('; ') || '—'}
     .join('\n\n');
 }
 
+async function callClaude(systemPrompt, messages) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 3000,
+      system: systemPrompt,
+      tools: [STRUCTURE_TOOL_DEFINITION],
+      messages,
+    }),
+  });
+  return res.json();
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
-  const { messages, author } = req.body; // messages: full running conversation from the client
+  const { messages, author } = req.body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages array required' });
   }
@@ -38,7 +63,6 @@ export default async function handler(req, res) {
   const latestUserMessage = messages[messages.length - 1];
 
   try {
-    // Persist the user's new message immediately.
     await supabase.from('chat_messages').insert({
       role: 'user',
       content: latestUserMessage.content,
@@ -56,78 +80,83 @@ export default async function handler(req, res) {
       .select('rule_text')
       .eq('active', true);
 
+    const structureTree = await getStructureTree();
+    const structureText = structureToText(structureTree);
+
     const rulesBlock =
       rules && rules.length ? rules.map((r) => `- ${r.rule_text}`).join('\n') : '(No rules taught yet.)';
 
     const systemPrompt = `
 You are a senior Organizational Design (OD) consultant working exclusively
-for Al Balad Development Company (BDC). Osaid and Ezwah are your clients —
-they run this review internally and are relying on you to catch what a
-careless first pass would miss.
+for Al Balad Development Company (BDC). Osaid and Ezwah are your clients.
 
 ${COMPANY_CONTEXT}
 
-${ORG_STRUCTURE}
+CURRENT APPROVED STRUCTURE (this reflects any changes already made — treat it as up to date):
+${structureText}
 
 YOUR JOB
-Read every function submission below as a set, against both the company
-context and the approved structure above. For each question you're asked,
-reason like an experienced OD analyst:
-- OVERLAP: two functions both claim the same accountability, deliverable,
-  or decision right, even if worded differently.
-- GAP: something clearly needs an owner but no submission claims it.
-- OWNERSHIP AMBIGUITY: responsibility described vaguely enough that two
-  functions could reasonably both claim or both avoid it.
-- BOUNDARY / STRUCTURE ISSUE: a function's claimed scope or reporting
-  doesn't match the approved structure, or doesn't match how BDC actually
-  operates (heritage mandate, contractor-managed delivery).
+Read every function submission below against the company context and the
+structure above. Identify:
+- OVERLAP: two functions claiming the same accountability, even if worded differently.
+- GAP: something that clearly needs an owner but nothing claims it.
+- OWNERSHIP AMBIGUITY: vague enough that two functions could both claim or both avoid it.
+- STRUCTURE ISSUE: a function's claimed scope or reporting doesn't match the approved structure above.
 
-RULES TAUGHT BY OSAID AND EZWAH (ground truth — override your own judgment
-when they conflict):
+If Osaid or Ezwah tell you about a REAL, CONFIRMED change to the approved
+structure (e.g. "HR moved from Shared Services to a new COO division"), use
+the update_org_structure tool to make that change — don't just say you will,
+actually call it. Do not call the tool for hypothetical questions or
+anything about a function's ownership/scope — only for genuine structure changes.
+
+RULES TAUGHT BY OSAID AND EZWAH (ground truth):
 ${rulesBlock}
 
 HOW TO ANSWER
-- Be direct and specific — name the functions involved, quote the exact
-  colliding phrase from each "Owns" list.
-- If asked for a full review, structure it as: Overlaps / Gaps /
-  Ambiguities / Structure issues, each with function names and reasoning.
-- If asked about two specific functions, focus only on those.
-- Say when you're not confident something is a real issue — don't
-  manufacture findings to seem thorough.
-- If told something is correct as-is, treat that as new information for
-  this conversation, and suggest adding it as a permanent rule if it
-  should apply going forward.
+- Be direct and specific — name functions, quote the exact colliding phrase.
+- Full review = structure as Overlaps / Gaps / Ambiguities / Structure issues.
+- Say when you're not confident — don't manufacture findings.
 
 FUNCTION SUBMISSIONS (${submissions?.length || 0} active):
 ${formatSubmissions(submissions || [])}
 `.trim();
 
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 3000,
-        system: systemPrompt,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      }),
-    });
+    let conversation = messages.map((m) => ({ role: m.role, content: m.content }));
+    let data = await callClaude(systemPrompt, conversation);
 
-    const data = await claudeRes.json();
+    // Tool-use loop: keep executing + replying until Claude stops calling tools.
+    let guard = 0;
+    while (data.stop_reason === 'tool_use' && guard < 3) {
+      guard++;
+      const toolUseBlock = data.content.find((b) => b.type === 'tool_use');
+      const textBlocks = data.content.filter((b) => b.type === 'text');
+
+      const result = await executeStructureTool(toolUseBlock.input);
+
+      conversation = [
+        ...conversation,
+        { role: 'assistant', content: data.content },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: toolUseBlock.id,
+              content: JSON.stringify(result),
+            },
+          ],
+        },
+      ];
+
+      data = await callClaude(systemPrompt, conversation);
+    }
+
     const textBlock = data.content?.find((b) => b.type === 'text');
-    if (!textBlock) return res.status(500).json({ error: 'No response from Claude', raw: data });
+    const replyText = textBlock ? textBlock.text : '(No text reply — check logs.)';
 
-    // Persist the assistant's reply too.
-    await supabase.from('chat_messages').insert({
-      role: 'assistant',
-      content: textBlock.text,
-    });
+    await supabase.from('chat_messages').insert({ role: 'assistant', content: replyText });
 
-    return res.status(200).json({ reply: textBlock.text });
+    return res.status(200).json({ reply: replyText });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
