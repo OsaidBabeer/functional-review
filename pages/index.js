@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
+import JSZip from 'jszip';
 
 const APP_NAME = 'BDC Functional Review';
 const APP_SUBTITLE = 'Organizational Design Review Agent';
@@ -123,29 +124,59 @@ function ReviewTab() {
     );
   }
 
+  async function extractSlidesFromPptx(file) {
+    const zip = await JSZip.loadAsync(file);
+    const slideFiles = Object.keys(zip.files)
+      .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/\d+/)[0], 10);
+        const numB = parseInt(b.match(/\d+/)[0], 10);
+        return numA - numB;
+      });
+
+    const texts = [];
+    for (const name of slideFiles) {
+      const xml = await zip.files[name].async('string');
+      const matches = [...xml.matchAll(/<a:t>(.*?)<\/a:t>/gs)];
+      texts.push(matches.map((m) => m[1]).join(' '));
+    }
+    return texts;
+  }
+
   async function handleUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
     setUploadStatus(`Reading ${file.name}...`);
-    const formData = new FormData();
-    formData.append('file', file);
+
     try {
-      const res = await fetch('/api/upload-pptx', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) {
-        setUploadStatus('Error: ' + data.error);
-      } else {
-        const saved = data.results.filter((r) => r.saved).length;
-        setUploadStatus(`${saved} function(s) loaded from ${file.name}`);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `I've read ${saved} function submission${saved === 1 ? '' : 's'} from "${file.name}". Ask me to review them whenever you're ready.`,
-          },
-        ]);
+      const slideTexts = await extractSlidesFromPptx(file);
+      let saved = 0;
+      let skipped = 0;
+
+      for (let i = 0; i < slideTexts.length; i++) {
+        const text = slideTexts[i];
+        if (!text || text.trim().length < 30) continue;
+
+        setUploadStatus(`Processing slide ${i + 1} of ${slideTexts.length}...`);
+        const res = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ raw_text: text, source_filename: file.name }),
+        });
+        const data = await res.json();
+        if (data.skipped) skipped++;
+        else if (data.success) saved++;
       }
+
+      setUploadStatus(`${saved} function(s) loaded from ${file.name}`);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `I've read ${saved} function submission${saved === 1 ? '' : 's'} from "${file.name}"${skipped ? ` (${skipped} slide(s) skipped, no function content)` : ''}. Ask me to review them whenever you're ready.`,
+        },
+      ]);
     } catch (err) {
       setUploadStatus('Error: ' + err.message);
     }
