@@ -22,12 +22,14 @@ export default function Home() {
   return (
     <>
       <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
       </Head>
+      <style>{`html, body, #__next { height: 100%; margin: 0; padding: 0; }`}</style>
       <div style={s.page}>
         <header style={s.header}>
           <div style={s.pattern} aria-hidden="true" />
@@ -314,34 +316,34 @@ function HelpTab() {
 }
 
 const s = {
-  page: { maxWidth: 900, margin: '0 auto', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', -apple-system, sans-serif", background: parch, color: ink },
+  page: { width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', -apple-system, sans-serif", background: parch, color: ink },
   header: { position: 'relative', background: '#fff', borderBottom: `1px solid ${line}` },
   pattern: { position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(110,107,71,0.15) 1px, transparent 0)', backgroundSize: '14px 14px', opacity: 0.5 },
-  headerInner: { position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px 12px' },
-  title: { fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, letterSpacing: '-0.01em', color: ink },
+  headerInner: { position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(14px, 4vw, 20px) clamp(14px, 4vw, 28px) 12px' },
+  title: { fontFamily: "'Fraunces', serif", fontSize: 'clamp(20px, 5vw, 26px)', fontWeight: 600, letterSpacing: '-0.01em', color: ink },
   subtitle: { fontSize: 12.5, color: olive, marginTop: 2, letterSpacing: '0.02em' },
-  tabRow: { position: 'relative', display: 'flex', gap: 4, padding: '0 24px' },
-  tabBtn: { background: 'none', border: 'none', padding: '10px 12px', fontSize: 13.5, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
+  tabRow: { position: 'relative', display: 'flex', gap: 4, overflowX: 'auto', whiteSpace: 'nowrap', padding: '0 clamp(14px, 4vw, 24px)' },
+  tabBtn: { background: 'none', border: 'none', padding: '10px 12px', fontSize: 13.5, cursor: 'pointer', fontFamily: "'Inter', sans-serif", flexShrink: 0 },
 
-  uploadRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 28px', background: '#fff', borderBottom: `1px solid ${line}` },
+  uploadRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px clamp(14px, 4vw, 28px)', background: '#fff', borderBottom: `1px solid ${line}` },
   uploadBtn: { background: brick, color: '#fff', border: 'none', borderRadius: 6, padding: '9px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
   uploadStatusInline: { fontSize: 12.5, color: olive },
 
-  chatArea: { flex: 1, overflowY: 'auto', padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 },
+  chatArea: { flex: 1, overflowY: 'auto', padding: 'clamp(14px, 4vw, 20px) clamp(14px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: 16 },
   bubbleRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
   avatar: { width: 28, height: 28, borderRadius: '50%', background: olive, color: '#fff', fontSize: 10.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
   userBubble: { background: brick, color: '#fff', padding: '11px 16px', borderRadius: '14px 14px 3px 14px', maxWidth: '72%', whiteSpace: 'pre-wrap', fontSize: 14.5, lineHeight: 1.55 },
   assistantBubble: { background: '#fff', border: `1px solid ${line}`, color: ink, padding: '11px 16px', borderRadius: '3px 14px 14px 14px', maxWidth: '78%', whiteSpace: 'pre-wrap', fontSize: 14.5, lineHeight: 1.6 },
   thinking: { color: olive, fontStyle: 'italic', fontFamily: "'Fraunces', serif" },
 
-  quickRow: { padding: '10px 28px 0', background: '#fff' },
+  quickRow: { padding: '10px clamp(14px, 4vw, 28px) 0', background: '#fff' },
   quickBtn: { background: 'transparent', color: olive, border: `1px solid ${olive}`, borderRadius: 6, padding: '7px 14px', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
 
-  inputRow: { display: 'flex', gap: 10, padding: '18px 28px', borderTop: `1px solid ${line}`, background: '#fff' },
+  inputRow: { display: 'flex', gap: 10, padding: 'clamp(12px, 4vw, 18px) clamp(14px, 4vw, 28px)', borderTop: `1px solid ${line}`, background: '#fff' },
   input: { flex: 1, padding: '13px 16px', borderRadius: 7, border: `1px solid ${line}`, fontSize: 14.5, outline: 'none', fontFamily: "'Inter', sans-serif", background: parch },
   sendBtn: { background: ink, color: '#fff', border: 'none', borderRadius: 7, padding: '0 26px', fontSize: 14.5, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
 
-  structureArea: { flex: 1, overflowY: 'auto', overflowX: 'auto', padding: '28px' },
+  structureArea: { flex: 1, overflowY: 'auto', overflowX: 'auto', padding: 'clamp(16px, 5vw, 28px)' },
   structureIntro: { fontSize: 13, color: olive, marginBottom: 28, maxWidth: 560, lineHeight: 1.5 },
 
   orgChart: { display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 'fit-content' },
@@ -354,7 +356,7 @@ const s = {
   deptStack: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch' },
   deptBox: { background: '#fff', border: `1px solid ${line}`, borderRadius: 5, padding: '6px 12px', fontSize: 12, whiteSpace: 'nowrap', textAlign: 'center' },
 
-  helpArea: { flex: 1, overflowY: 'auto', padding: '32px 28px', maxWidth: 660 },
+  helpArea: { flex: 1, overflowY: 'auto', padding: 'clamp(18px, 5vw, 32px) clamp(14px, 4vw, 28px)', maxWidth: 660 },
   helpH2: { fontFamily: "'Fraunces', serif", fontSize: 24, marginBottom: 10 },
   helpLead: { fontSize: 15, lineHeight: 1.65, color: ink, marginBottom: 28 },
   helpStep: { display: 'flex', gap: 16, marginBottom: 22 },
