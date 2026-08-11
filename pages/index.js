@@ -151,32 +151,30 @@ function ReviewTab() {
 
     try {
       const slideTexts = await extractSlidesFromPptx(file);
-      let saved = 0;
-      let skipped = 0;
+      const fullText = slideTexts
+        .map((t, i) => `--- Slide ${i + 1} ---\n${t}`)
+        .join('\n\n');
 
-      for (let i = 0; i < slideTexts.length; i++) {
-        const text = slideTexts[i];
-        if (!text || text.trim().length < 30) continue;
+      setUploadStatus(`Analyzing ${file.name}...`);
+      const res = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_text: fullText, source_filename: file.name }),
+      });
+      const data = await res.json();
 
-        setUploadStatus(`Processing slide ${i + 1} of ${slideTexts.length}...`);
-        const res = await fetch('/api/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ raw_text: text, source_filename: file.name }),
-        });
-        const data = await res.json();
-        if (data.skipped) skipped++;
-        else if (data.success) saved++;
+      if (!res.ok) {
+        setUploadStatus('Error: ' + data.error);
+      } else {
+        setUploadStatus(`${data.count} function(s) loaded from ${file.name}`);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: `I've read "${file.name}" and found ${data.count} real submission${data.count === 1 ? '' : 's'} in it (ignoring the instructional/example slides). Ask me to review them whenever you're ready.`,
+          },
+        ]);
       }
-
-      setUploadStatus(`${saved} function(s) loaded from ${file.name}`);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `I've read ${saved} function submission${saved === 1 ? '' : 's'} from "${file.name}"${skipped ? ` (${skipped} slide(s) skipped, no function content)` : ''}. Ask me to review them whenever you're ready.`,
-        },
-      ]);
     } catch (err) {
       setUploadStatus('Error: ' + err.message);
     }
@@ -291,9 +289,9 @@ function HelpTab() {
         <div>
           <div style={s.helpStepTitle}>Upload the submission</div>
           <div style={s.helpStepBody}>
-            Drop in the pptx as-is — one slide per sector. It splits every slide apart and reads
-            each one on its own, so a 20-slide file becomes 20 separate function records, not one
-            blur of text.
+            Drop in the pptx as-is. It reads the whole file, finds the real filled-in answer even
+            if it's spread across several slides, and ignores the instructional/example content
+            that comes with the template.
           </div>
         </div>
       </div>
