@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import JSZip from 'jszip';
 import ReactMarkdown from 'react-markdown';
@@ -43,8 +43,16 @@ export default function Home() {
   return (
     <>
       <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1"
+        />
+
+        <link
+          rel="preconnect"
+          href="https://fonts.googleapis.com"
+        />
+
         <link
           href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600&family=Inter:wght@400;500;600&display=swap"
           rel="stylesheet"
@@ -76,66 +84,101 @@ export default function Home() {
 
       <div style={s.page}>
         <header style={s.header}>
-          <div style={s.pattern} aria-hidden="true" />
+          <div
+            style={s.pattern}
+            aria-hidden="true"
+          />
 
           <div style={s.headerInner}>
             <div>
-              <div style={s.title}>{APP_NAME}</div>
-              <div style={s.subtitle}>{APP_SUBTITLE}</div>
+              <div style={s.title}>
+                {APP_NAME}
+              </div>
+
+              <div style={s.subtitle}>
+                {APP_SUBTITLE}
+              </div>
             </div>
           </div>
 
           <nav style={s.tabRow}>
             <TabButton
               active={tab === 'help'}
-              onClick={() => setTab('help')}
+              onClick={() =>
+                setTab('help')
+              }
             >
               How It Works
             </TabButton>
 
             <TabButton
               active={tab === 'review'}
-              onClick={() => setTab('review')}
+              onClick={() =>
+                setTab('review')
+              }
             >
               Function Review
             </TabButton>
 
             <TabButton
               active={tab === 'references'}
-              onClick={() => setTab('references')}
+              onClick={() =>
+                setTab('references')
+              }
             >
               Company References
             </TabButton>
 
             <TabButton
               active={tab === 'structure'}
-              onClick={() => setTab('structure')}
+              onClick={() =>
+                setTab('structure')
+              }
             >
               Structure
             </TabButton>
           </nav>
         </header>
 
-        {tab === 'help' && <HelpTab />}
-        {tab === 'review' && <ReviewTab />}
-        {tab === 'references' && <ReferencesTab />}
-        {tab === 'structure' && <StructureTab />}
+        {tab === 'help' && (
+          <HelpTab />
+        )}
+
+        {tab === 'review' && (
+          <ReviewTab />
+        )}
+
+        {tab === 'references' && (
+          <ReferencesTab />
+        )}
+
+        {tab === 'structure' && (
+          <StructureTab />
+        )}
       </div>
     </>
   );
 }
 
-function TabButton({ active, onClick, children }) {
+function TabButton({
+  active,
+  onClick,
+  children,
+}) {
   return (
     <button
       onClick={onClick}
       style={{
         ...s.tabBtn,
-        color: active ? brick : '#8a8266',
+        color: active
+          ? brick
+          : '#8a8266',
         borderBottom: active
           ? `2px solid ${brick}`
           : '2px solid transparent',
-        fontWeight: active ? 600 : 500,
+        fontWeight: active
+          ? 600
+          : 500,
       }}
     >
       {children}
@@ -143,30 +186,62 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
-async function extractSlidesFromPptx(file) {
-  const zip = await JSZip.loadAsync(file);
+async function extractSlidesFromPptx(
+  file
+) {
+  const zip =
+    await JSZip.loadAsync(file);
 
-  const slideFiles = Object.keys(zip.files)
-    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+  const slideFiles = Object.keys(
+    zip.files
+  )
+    .filter((name) =>
+      /^ppt\/slides\/slide\d+\.xml$/.test(
+        name
+      )
+    )
     .sort(
       (a, b) =>
-        parseInt(a.match(/\d+/)[0], 10) -
-        parseInt(b.match(/\d+/)[0], 10)
+        parseInt(
+          a.match(/\d+/)[0],
+          10
+        ) -
+        parseInt(
+          b.match(/\d+/)[0],
+          10
+        )
     );
 
   const texts = [];
 
   for (const name of slideFiles) {
-    const xml = await zip.files[name].async('string');
-    const matches = [...xml.matchAll(/<a:t>(.*?)<\/a:t>/gs)];
+    const xml =
+      await zip.files[
+        name
+      ].async('string');
+
+    const matches = [
+      ...xml.matchAll(
+        /<a:t>(.*?)<\/a:t>/gs
+      ),
+    ];
 
     texts.push(
-      matches.map((m) => decodeXml(m[1])).join(' ')
+      matches
+        .map((m) =>
+          decodeXml(m[1])
+        )
+        .join(' ')
     );
   }
 
   return texts
-    .map((t, i) => `--- Slide ${i + 1} ---\n${t}`)
+    .map(
+      (t, i) =>
+        `--- Slide ${
+          i + 1
+        } ---\n${t}`
+    )
     .join('\n\n');
 }
 
@@ -179,11 +254,18 @@ function decodeXml(value) {
     .replace(/&apos;/g, "'");
 }
 
-async function readReferenceFile(file) {
-  const lower = file.name.toLowerCase();
+async function readReferenceFile(
+  file
+) {
+  const lower =
+    file.name.toLowerCase();
 
-  if (lower.endsWith('.pptx')) {
-    return extractSlidesFromPptx(file);
+  if (
+    lower.endsWith('.pptx')
+  ) {
+    return extractSlidesFromPptx(
+      file
+    );
   }
 
   if (
@@ -200,30 +282,96 @@ async function readReferenceFile(file) {
 }
 
 function ReviewTab() {
-  const [messages, setMessages] = useState([WELCOME]);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [status, setStatus] = useState('');
-  const [file, setFile] = useState(null);
-  const [rawText, setRawText] = useState('');
-  const [userComment, setUserComment] = useState('');
-  const [drafts, setDrafts] = useState([]);
-  const [draftIndex, setDraftIndex] = useState(0);
-  const [manualMode, setManualMode] = useState(false);
-  const [savedSubmissions, setSavedSubmissions] = useState([]);
-  const [selectedTarget, setSelectedTarget] = useState('');
+  const [messages, setMessages] =
+    useState([WELCOME]);
+
+  const [input, setInput] =
+    useState('');
+
+  const [sending, setSending] =
+    useState(false);
+
+  const [status, setStatus] =
+    useState('');
+
+  const [file, setFile] =
+    useState(null);
+
+  const [rawText, setRawText] =
+    useState('');
+
+  const [
+    userComment,
+    setUserComment,
+  ] = useState('');
+
+  const [drafts, setDrafts] =
+    useState([]);
+
+  const [
+    draftIndex,
+    setDraftIndex,
+  ] = useState(0);
+
+  const [
+    manualMode,
+    setManualMode,
+  ] = useState(false);
+
+  const [
+    savedSubmissions,
+    setSavedSubmissions,
+  ] = useState([]);
+
+  const [
+    selectedTarget,
+    setSelectedTarget,
+  ] = useState('');
+
+  const [
+    searchQuery,
+    setSearchQuery,
+  ] = useState('');
+
+  const [
+    reviewAction,
+    setReviewAction,
+  ] = useState('');
 
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
 
-  const draft = drafts[draftIndex] || null;
+  const draft =
+    drafts[draftIndex] || null;
+
+  const normalizedSearch =
+    searchQuery
+      .trim()
+      .toLowerCase();
+
+  const visibleMessages =
+    normalizedSearch
+      ? messages.filter((m) =>
+          String(
+            m.content || ''
+          )
+            .toLowerCase()
+            .includes(
+              normalizedSearch
+            )
+        )
+      : messages;
 
   useEffect(() => {
     fetch('/api/chat-history')
       .then((r) => r.json())
       .then((data) => {
-        if (data.messages?.length) {
-          setMessages(data.messages);
+        if (
+          data.messages?.length
+        ) {
+          setMessages(
+            data.messages
+          );
         }
       })
       .catch(() => {});
@@ -233,22 +381,33 @@ function ReviewTab() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
+      top:
+        scrollRef.current
+          .scrollHeight,
       behavior: 'smooth',
     });
   }, [messages, sending]);
 
   async function refreshSubmissions() {
     try {
-      const res = await fetch('/api/submissions');
-      const data = await res.json();
-      setSavedSubmissions(data.submissions || []);
+      const res = await fetch(
+        '/api/submissions'
+      );
+
+      const data =
+        await res.json();
+
+      setSavedSubmissions(
+        data.submissions || []
+      );
     } catch (_) {}
   }
 
   function selectedSubmission() {
     return savedSubmissions.find(
-      (x) => String(x.id) === String(selectedTarget)
+      (x) =>
+        String(x.id) ===
+        String(selectedTarget)
     );
   }
 
@@ -257,7 +416,12 @@ function ReviewTab() {
     mode = 'chat',
     overrideTarget = null
   ) {
-    if (!text.trim() || sending) return;
+    if (
+      !text.trim() ||
+      sending
+    ) {
+      return;
+    }
 
     const newMessages = [
       ...messages,
@@ -271,32 +435,54 @@ function ReviewTab() {
     setInput('');
     setSending(true);
 
+    setReviewAction(
+      mode === 'full_review'
+        ? 'full_review'
+        : mode === 'review'
+        ? 'review'
+        : 'chat'
+    );
+
     const target =
-      overrideTarget || selectedSubmission();
+      overrideTarget ||
+      selectedSubmission();
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: newMessages,
-          review_context: {
-            mode,
-            target_department_function:
-              target?.department_function || null,
-            target_division:
-              target?.division || null,
-            user_comment:
-              userComment ||
-              target?.user_comments ||
-              '',
-          },
-        }),
-      });
+      const res = await fetch(
+        '/api/chat',
+        {
+          method: 'POST',
 
-      const data = await res.json();
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+
+          body: JSON.stringify({
+            messages: newMessages,
+
+            review_context: {
+              mode,
+
+              target_department_function:
+                target?.department_function ||
+                null,
+
+              target_division:
+                target?.division ||
+                null,
+
+              user_comment:
+                userComment ||
+                target?.user_comments ||
+                '',
+            },
+          }),
+        }
+      );
+
+      const data =
+        await res.json();
 
       setMessages([
         ...newMessages,
@@ -316,13 +502,15 @@ function ReviewTab() {
           content: `Error: ${err.message}`,
         },
       ]);
+    } finally {
+      setSending(false);
+      setReviewAction('');
     }
-
-    setSending(false);
   }
 
   function handleFileChosen(e) {
-    const chosen = e.target.files?.[0];
+    const chosen =
+      e.target.files?.[0];
 
     if (!chosen) return;
 
@@ -342,10 +530,15 @@ function ReviewTab() {
   async function extractDocument() {
     if (!file) return;
 
-    setStatus(`Reading ${file.name}…`);
+    setStatus(
+      `Reading ${file.name}…`
+    );
 
     try {
-      const text = await extractSlidesFromPptx(file);
+      const text =
+        await extractSlidesFromPptx(
+          file
+        );
 
       setRawText(text);
 
@@ -353,42 +546,64 @@ function ReviewTab() {
         `Extracting responsibilities from ${file.name}…`
       );
 
-      const res = await fetch('/api/extract', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          raw_text: text,
-          source_filename: file.name,
-          user_comment: userComment,
-        }),
-      });
+      const res = await fetch(
+        '/api/extract',
+        {
+          method: 'POST',
 
-      const data = await res.json();
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+
+          body: JSON.stringify({
+            raw_text: text,
+            source_filename:
+              file.name,
+            user_comment:
+              userComment,
+          }),
+        }
+      );
+
+      const data =
+        await res.json();
 
       if (!res.ok) {
         throw new Error(
-          data.error || 'Extraction failed'
+          data.error ||
+            'Extraction failed'
         );
       }
 
-      if (!data.submissions?.length) {
+      if (
+        !data.submissions?.length
+      ) {
         throw new Error(
           'No completed department submission was found in this file.'
         );
       }
 
-      setDrafts(data.submissions);
+      setDrafts(
+        data.submissions
+      );
+
       setDraftIndex(0);
 
       setStatus(
-        `Extracted ${data.submissions.length} submission${
-          data.submissions.length === 1 ? '' : 's'
+        `Extracted ${
+          data.submissions.length
+        } submission${
+          data.submissions
+            .length === 1
+            ? ''
+            : 's'
         }. Review the statements before saving.`
       );
     } catch (err) {
-      setStatus(`Error. ${err.message}`);
+      setStatus(
+        `Error. ${err.message}`
+      );
     }
   }
 
@@ -400,6 +615,7 @@ function ReviewTab() {
     setDrafts([
       {
         ...EMPTY_SUBMISSION,
+
         extracted_items: [
           {
             type: 'responsibility',
@@ -429,9 +645,13 @@ function ReviewTab() {
     );
   }
 
-  function updateItem(index, patch) {
+  function updateItem(
+    index,
+    patch
+  ) {
     const items = [
-      ...(draft?.extracted_items || []),
+      ...(draft?.extracted_items ||
+        []),
     ];
 
     items[index] = {
@@ -447,7 +667,10 @@ function ReviewTab() {
   function removeItem(index) {
     updateDraft({
       extracted_items:
-        (draft?.extracted_items || []).filter(
+        (
+          draft?.extracted_items ||
+          []
+        ).filter(
           (_, i) => i !== index
         ),
     });
@@ -456,7 +679,9 @@ function ReviewTab() {
   function addItem() {
     updateDraft({
       extracted_items: [
-        ...(draft?.extracted_items || []),
+        ...(draft?.extracted_items ||
+          []),
+
         {
           type: 'responsibility',
           text: '',
@@ -465,20 +690,32 @@ function ReviewTab() {
     });
   }
 
-  function normalizeDraftForSave(d) {
-    const cleanItems = (d.extracted_items || [])
-      .filter((x) => x.text?.trim())
+  function normalizeDraftForSave(
+    d
+  ) {
+    const cleanItems = (
+      d.extracted_items || []
+    )
+      .filter((x) =>
+        x.text?.trim()
+      )
       .map((x) => ({
-        type: x.type || 'responsibility',
+        type:
+          x.type ||
+          'responsibility',
+
         text: x.text.trim(),
       }));
 
     const byType = (types) =>
       cleanItems
-        .filter((x) => types.includes(x.type))
+        .filter((x) =>
+          types.includes(x.type)
+        )
         .map((x) => x.text);
 
-    const mandates = byType(['mandate']);
+    const mandates =
+      byType(['mandate']);
 
     return {
       ...d,
@@ -488,29 +725,40 @@ function ReviewTab() {
         d.functional_statement ||
         '',
 
-      core_responsibilities: byType([
-        'responsibility',
-        'activity',
-        'task',
-        'function',
-        'accountability',
+      core_responsibilities:
+        byType([
+          'responsibility',
+          'activity',
+          'task',
+          'function',
+          'accountability',
+        ]),
+
+      owns: byType([
+        'ownership',
       ]),
 
-      owns: byType(['ownership']),
+      does_not_own: byType([
+        'boundary',
+      ]),
 
-      does_not_own: byType(['boundary']),
+      key_outputs: byType([
+        'output',
+      ]),
 
-      key_outputs: byType(['output']),
-
-      interfaces: byType(['interface']),
+      interfaces: byType([
+        'interface',
+      ]),
 
       kpis: byType(['kpi']),
 
-      decision_authorities: byType([
-        'decision_authority',
-      ]),
+      decision_authorities:
+        byType([
+          'decision_authority',
+        ]),
 
-      extracted_items: cleanItems,
+      extracted_items:
+        cleanItems,
     };
   }
 
@@ -521,7 +769,9 @@ function ReviewTab() {
     if (!draft) return;
 
     const normalized =
-      normalizeDraftForSave(draft);
+      normalizeDraftForSave(
+        draft
+      );
 
     if (
       !normalized.division.trim() ||
@@ -530,45 +780,60 @@ function ReviewTab() {
       setStatus(
         'Division and department or function are required before saving.'
       );
+
       return;
     }
 
-    setStatus('Saving submission…');
+    setStatus(
+      'Saving submission…'
+    );
 
     try {
       const res = await fetch(
         '/api/submissions',
         {
           method: 'POST',
+
           headers: {
             'Content-Type':
               'application/json',
           },
+
           body: JSON.stringify({
-            submission: normalized,
+            submission:
+              normalized,
+
             raw_text: rawText,
+
             source_filename:
               file?.name || null,
+
             user_comments:
               userComment,
           }),
         }
       );
 
-      const data = await res.json();
+      const data =
+        await res.json();
 
       if (!res.ok) {
         throw new Error(
-          data.error || 'Save failed'
+          data.error ||
+            'Save failed'
         );
       }
 
-      setStatus('Submission saved.');
+      setStatus(
+        'Submission saved.'
+      );
 
       await refreshSubmissions();
 
       setSelectedTarget(
-        String(data.submission.id)
+        String(
+          data.submission.id
+        )
       );
 
       if (runAfter) {
@@ -576,14 +841,18 @@ function ReviewTab() {
           full
             ? `Run a full OD review for ${normalized.department_function}. Compare it against everything available in the system.`
             : `Review ${normalized.department_function}. Show only meaningful findings that need OD attention.`,
+
           full
             ? 'full_review'
             : 'review',
+
           data.submission
         );
       }
     } catch (err) {
-      setStatus(`Error. ${err.message}`);
+      setStatus(
+        `Error. ${err.message}`
+      );
     }
   }
 
@@ -595,6 +864,7 @@ function ReviewTab() {
       target
         ? `Run a full OD review for ${target.department_function}. Compare it against everything available in the system.`
         : 'Run a full OD review across all active functions and everything available in the system.',
+
       'full_review'
     );
   }
@@ -602,30 +872,51 @@ function ReviewTab() {
   return (
     <div style={s.reviewLayout}>
       <div style={s.workspace}>
-        <div style={s.workspaceHeader}>
+        <div
+          style={
+            s.workspaceHeader
+          }
+        >
           <div>
-            <div style={s.sectionEyebrow}>
+            <div
+              style={
+                s.sectionEyebrow
+              }
+            >
               WORKSPACE
             </div>
 
-            <div style={s.workspaceTitle}>
-              Prepare the function before review
+            <div
+              style={
+                s.workspaceTitle
+              }
+            >
+              Prepare the function
+              before review
             </div>
           </div>
 
-          <div style={s.workspaceActions}>
+          <div
+            style={
+              s.workspaceActions
+            }
+          >
             <input
               type="file"
               accept=".pptx"
               ref={fileRef}
-              onChange={handleFileChosen}
+              onChange={
+                handleFileChosen
+              }
               style={{
                 display: 'none',
               }}
             />
 
             <button
-              style={s.secondaryBtn}
+              style={
+                s.secondaryBtn
+              }
               onClick={() =>
                 fileRef.current?.click()
               }
@@ -634,19 +925,33 @@ function ReviewTab() {
             </button>
 
             <button
-              style={s.secondaryBtn}
-              onClick={startManual}
+              style={
+                s.secondaryBtn
+              }
+              onClick={
+                startManual
+              }
             >
               Manual Entry
             </button>
           </div>
         </div>
 
-        {(file || manualMode || draft) && (
-          <div style={s.prepareCard}>
+        {(file ||
+          manualMode ||
+          draft) && (
+          <div
+            style={s.prepareCard}
+          >
             {file && (
-              <div style={s.fileChipRow}>
-                <div style={s.fileChip}>
+              <div
+                style={
+                  s.fileChipRow
+                }
+              >
+                <div
+                  style={s.fileChip}
+                >
                   📄 {file.name}
                 </div>
 
@@ -664,13 +969,20 @@ function ReviewTab() {
               </div>
             )}
 
-            <label style={s.label}>
-              Comments or instructions
+            <label
+              style={s.label}
+            >
+              Comments or
+              instructions
             </label>
 
             <textarea
-              style={s.commentBox}
-              value={userComment}
+              style={
+                s.commentBox
+              }
+              value={
+                userComment
+              }
               onChange={(e) =>
                 setUserComment(
                   e.target.value
@@ -681,17 +993,25 @@ function ReviewTab() {
               }
             />
 
-            {file && !draft && (
-              <button
-                style={s.primaryBtn}
-                onClick={extractDocument}
-              >
-                Extract Responsibilities
-              </button>
-            )}
+            {file &&
+              !draft && (
+                <button
+                  style={
+                    s.primaryBtn
+                  }
+                  onClick={
+                    extractDocument
+                  }
+                >
+                  Extract
+                  Responsibilities
+                </button>
+              )}
 
             {status && (
-              <div style={s.status}>
+              <div
+                style={s.status}
+              >
                 {status}
               </div>
             )}
@@ -701,37 +1021,63 @@ function ReviewTab() {
         {draft && (
           <SubmissionEditor
             draft={draft}
-            updateDraft={updateDraft}
-            updateItem={updateItem}
-            removeItem={removeItem}
+            updateDraft={
+              updateDraft
+            }
+            updateItem={
+              updateItem
+            }
+            removeItem={
+              removeItem
+            }
             addItem={addItem}
             drafts={drafts}
-            draftIndex={draftIndex}
+            draftIndex={
+              draftIndex
+            }
             setDraftIndex={
               setDraftIndex
             }
             onSave={() =>
-              saveDraft(false, false)
+              saveDraft(
+                false,
+                false
+              )
             }
             onReview={() =>
-              saveDraft(true, false)
+              saveDraft(
+                true,
+                false
+              )
             }
             onFullReview={() =>
-              saveDraft(true, true)
+              saveDraft(
+                true,
+                true
+              )
+            }
+            busy={sending}
+            reviewAction={
+              reviewAction
             }
           />
         )}
       </div>
 
-      <div style={s.reviewToolbar}>
+      <div
+        style={s.reviewToolbar}
+      >
         <select
           style={s.targetSelect}
-          value={selectedTarget}
+          value={
+            selectedTarget
+          }
           onChange={(e) =>
             setSelectedTarget(
               e.target.value
             )
           }
+          disabled={sending}
         >
           <option value="">
             All active functions
@@ -743,7 +1089,9 @@ function ReviewTab() {
                 key={x.id}
                 value={x.id}
               >
-                {x.department_function}{' '}
+                {
+                  x.department_function
+                }{' '}
                 · {x.division}
               </option>
             )
@@ -751,209 +1099,275 @@ function ReviewTab() {
         </select>
 
         <button
-          style={s.fullReviewBtn}
-          onClick={runFullReview}
+          style={{
+            ...s.fullReviewBtn,
+            ...(sending
+              ? s.disabledBtn
+              : {}),
+          }}
+          onClick={
+            runFullReview
+          }
           disabled={sending}
         >
-          Run Full Review
+          {sending &&
+          reviewAction ===
+            'full_review'
+            ? 'Reviewing…'
+            : 'Run Full Review'}
         </button>
+      </div>
+
+      <div
+        style={s.chatSearchRow}
+      >
+        <span
+          style={s.searchIcon}
+        >
+          ⌕
+        </span>
+
+        <input
+          style={
+            s.chatSearchInput
+          }
+          value={searchQuery}
+          onChange={(e) =>
+            setSearchQuery(
+              e.target.value
+            )
+          }
+          placeholder="Search conversation…"
+        />
+
+        {searchQuery && (
+          <button
+            style={
+              s.clearSearchBtn
+            }
+            onClick={() =>
+              setSearchQuery('')
+            }
+          >
+            Clear
+          </button>
+        )}
+
+        <span
+          style={s.searchCount}
+        >
+          {normalizedSearch
+            ? `${visibleMessages.length} found`
+            : ''}
+        </span>
       </div>
 
       <div
         style={s.chatArea}
         ref={scrollRef}
       >
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            style={{
-              ...s.bubbleRow,
-              justifyContent:
-                m.role === 'user'
-                  ? 'flex-end'
-                  : 'flex-start',
-            }}
-          >
-            {m.role ===
-              'assistant' && (
-              <div style={s.avatar}>
-                OD
-              </div>
-            )}
-
+        {visibleMessages.map(
+          (m, i) => (
             <div
-              style={
-                m.role === 'user'
-                  ? s.userBubble
-                  : s.assistantBubble
-              }
+              key={i}
+              style={{
+                ...s.bubbleRow,
+
+                justifyContent:
+                  m.role === 'user'
+                    ? 'flex-end'
+                    : 'flex-start',
+              }}
             >
               {m.role ===
-              'assistant' ? (
-                <ReactMarkdown
-                  remarkPlugins={[
-                    remarkGfm,
-                  ]}
-                  components={{
-                    table: ({
-                      children,
-                    }) => (
-                      <div
-                        style={
-                          s.tableScroll
-                        }
-                      >
-                        <table
+                'assistant' && (
+                <div
+                  style={
+                    s.avatar
+                  }
+                >
+                  OD
+                </div>
+              )}
+
+              <div
+                style={
+                  m.role === 'user'
+                    ? s.userBubble
+                    : s.assistantBubble
+                }
+              >
+                {m.role ===
+                'assistant' ? (
+                  <ReactMarkdown
+                    remarkPlugins={[
+                      remarkGfm,
+                    ]}
+                    components={{
+                      table: ({
+                        children,
+                      }) => (
+                        <div
                           style={
-                            s.markdownTable
+                            s.tableScroll
+                          }
+                        >
+                          <table
+                            style={
+                              s.markdownTable
+                            }
+                          >
+                            {children}
+                          </table>
+                        </div>
+                      ),
+
+                      th: ({
+                        children,
+                      }) => (
+                        <th
+                          style={
+                            s.markdownTh
                           }
                         >
                           {children}
-                        </table>
-                      </div>
-                    ),
+                        </th>
+                      ),
 
-                    th: ({
-                      children,
-                    }) => (
-                      <th
-                        style={
-                          s.markdownTh
-                        }
-                      >
-                        {children}
-                      </th>
-                    ),
+                      td: ({
+                        children,
+                      }) => (
+                        <td
+                          style={
+                            s.markdownTd
+                          }
+                        >
+                          {children}
+                        </td>
+                      ),
 
-                    td: ({
-                      children,
-                    }) => (
-                      <td
-                        style={
-                          s.markdownTd
-                        }
-                      >
-                        {children}
-                      </td>
-                    ),
+                      p: ({
+                        children,
+                      }) => (
+                        <p
+                          style={
+                            s.markdownP
+                          }
+                        >
+                          {children}
+                        </p>
+                      ),
 
-                    p: ({
-                      children,
-                    }) => (
-                      <p
-                        style={
-                          s.markdownP
-                        }
-                      >
-                        {children}
-                      </p>
-                    ),
+                      ul: ({
+                        children,
+                      }) => (
+                        <ul
+                          style={
+                            s.markdownList
+                          }
+                        >
+                          {children}
+                        </ul>
+                      ),
 
-                    ul: ({
-                      children,
-                    }) => (
-                      <ul
-                        style={
-                          s.markdownList
-                        }
-                      >
-                        {children}
-                      </ul>
-                    ),
+                      ol: ({
+                        children,
+                      }) => (
+                        <ol
+                          style={
+                            s.markdownList
+                          }
+                        >
+                          {children}
+                        </ol>
+                      ),
 
-                    ol: ({
-                      children,
-                    }) => (
-                      <ol
-                        style={
-                          s.markdownList
-                        }
-                      >
-                        {children}
-                      </ol>
-                    ),
+                      li: ({
+                        children,
+                      }) => (
+                        <li
+                          style={
+                            s.markdownLi
+                          }
+                        >
+                          {children}
+                        </li>
+                      ),
 
-                    li: ({
-                      children,
-                    }) => (
-                      <li
-                        style={
-                          s.markdownLi
-                        }
-                      >
-                        {children}
-                      </li>
-                    ),
+                      h1: ({
+                        children,
+                      }) => (
+                        <h1
+                          style={
+                            s.markdownH1
+                          }
+                        >
+                          {children}
+                        </h1>
+                      ),
 
-                    h1: ({
-                      children,
-                    }) => (
-                      <h1
-                        style={
-                          s.markdownH1
-                        }
-                      >
-                        {children}
-                      </h1>
-                    ),
+                      h2: ({
+                        children,
+                      }) => (
+                        <h2
+                          style={
+                            s.markdownH2
+                          }
+                        >
+                          {children}
+                        </h2>
+                      ),
 
-                    h2: ({
-                      children,
-                    }) => (
-                      <h2
-                        style={
-                          s.markdownH2
-                        }
-                      >
-                        {children}
-                      </h2>
-                    ),
+                      h3: ({
+                        children,
+                      }) => (
+                        <h3
+                          style={
+                            s.markdownH3
+                          }
+                        >
+                          {children}
+                        </h3>
+                      ),
 
-                    h3: ({
-                      children,
-                    }) => (
-                      <h3
-                        style={
-                          s.markdownH3
-                        }
-                      >
-                        {children}
-                      </h3>
-                    ),
+                      blockquote: ({
+                        children,
+                      }) => (
+                        <blockquote
+                          style={
+                            s.markdownQuote
+                          }
+                        >
+                          {children}
+                        </blockquote>
+                      ),
 
-                    blockquote: ({
-                      children,
-                    }) => (
-                      <blockquote
-                        style={
-                          s.markdownQuote
-                        }
-                      >
-                        {children}
-                      </blockquote>
-                    ),
-
-                    hr: () => (
-                      <hr
-                        style={
-                          s.markdownHr
-                        }
-                      />
-                    ),
-                  }}
-                >
-                  {m.content}
-                </ReactMarkdown>
-              ) : (
-                m.content
-              )}
+                      hr: () => (
+                        <hr
+                          style={
+                            s.markdownHr
+                          }
+                        />
+                      ),
+                    }}
+                  >
+                    {m.content}
+                  </ReactMarkdown>
+                ) : (
+                  m.content
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        )}
 
         {sending && (
-          <div style={s.bubbleRow}>
-            <div style={s.avatar}>
+          <div
+            style={s.bubbleRow}
+          >
+            <div
+              style={s.avatar}
+            >
               OD
             </div>
 
@@ -963,16 +1377,26 @@ function ReviewTab() {
               }
             >
               <span
-                style={s.thinking}
+                style={
+                  s.thinking
+                }
               >
-                reviewing…
+                {reviewAction ===
+                'full_review'
+                  ? 'Running full OD review…'
+                  : reviewAction ===
+                    'review'
+                  ? 'Running OD checklist review…'
+                  : 'Working…'}
               </span>
             </div>
           </div>
         )}
       </div>
 
-      <div style={s.composerWrap}>
+      <div
+        style={s.composerWrap}
+      >
         {file && (
           <div
             style={
@@ -1000,27 +1424,40 @@ function ReviewTab() {
             rows={1}
             placeholder="Ask about ownership, overlaps, gaps, or add context…"
             onChange={(e) =>
-              setInput(e.target.value)
+              setInput(
+                e.target.value
+              )
             }
             onKeyDown={(e) => {
               if (
-                e.key === 'Enter' &&
+                e.key ===
+                  'Enter' &&
                 !e.shiftKey
               ) {
                 e.preventDefault();
-                sendMessage(input);
+
+                sendMessage(
+                  input
+                );
               }
             }}
           />
 
           <button
-            style={s.sendBtn}
+            style={{
+              ...s.sendBtn,
+              ...(sending
+                ? s.disabledBtn
+                : {}),
+            }}
             onClick={() =>
               sendMessage(input)
             }
             disabled={sending}
           >
-            Send
+            {sending
+              ? 'Working…'
+              : 'Send'}
           </button>
         </div>
       </div>
@@ -1040,18 +1477,26 @@ function SubmissionEditor({
   onSave,
   onReview,
   onFullReview,
+  busy,
+  reviewAction,
 }) {
   return (
     <div style={s.editorCard}>
-      <div style={s.editorHeader}>
+      <div
+        style={s.editorHeader}
+      >
         <div>
           <div
-            style={s.sectionEyebrow}
+            style={
+              s.sectionEyebrow
+            }
           >
             EXTRACTED SUBMISSION
           </div>
 
-          <div style={s.editorTitle}>
+          <div
+            style={s.editorTitle}
+          >
             Check what the AI
             captured
           </div>
@@ -1069,17 +1514,19 @@ function SubmissionEditor({
               )
             }
           >
-            {drafts.map((d, i) => (
-              <option
-                key={i}
-                value={i}
-              >
-                {d.department_function ||
-                  `Submission ${
-                    i + 1
-                  }`}
-              </option>
-            ))}
+            {drafts.map(
+              (d, i) => (
+                <option
+                  key={i}
+                  value={i}
+                >
+                  {d.department_function ||
+                    `Submission ${
+                      i + 1
+                    }`}
+                </option>
+              )
+            )}
           </select>
         )}
       </div>
@@ -1088,7 +1535,8 @@ function SubmissionEditor({
         <Field
           label="Division"
           value={
-            draft.division || ''
+            draft.division ||
+            ''
           }
           onChange={(v) =>
             updateDraft({
@@ -1131,7 +1579,9 @@ function SubmissionEditor({
         }
       />
 
-      <div style={s.itemsHeader}>
+      <div
+        style={s.itemsHeader}
+      >
         <div>
           <div style={s.label}>
             Extracted statements
@@ -1142,14 +1592,16 @@ function SubmissionEditor({
           >
             Edit, remove, or add
             anything before the
-            review. This is the audit
-            list the agent will use.
+            review. This is the
+            audit list the agent
+            will use.
           </div>
         </div>
 
         <button
           style={s.textBtn}
           onClick={addItem}
+          disabled={busy}
         >
           ＋ Add item
         </button>
@@ -1174,6 +1626,7 @@ function SubmissionEditor({
                     .value,
                 })
               }
+              disabled={busy}
             >
               {ITEM_TYPES.map(
                 (t) => (
@@ -1190,21 +1643,27 @@ function SubmissionEditor({
             <textarea
               style={s.itemText}
               rows={2}
-              value={item.text || ''}
+              value={
+                item.text || ''
+              }
               onChange={(e) =>
                 updateItem(i, {
                   text: e.target
                     .value,
                 })
               }
+              disabled={busy}
             />
 
             <button
-              style={s.removeBtn}
+              style={
+                s.removeBtn
+              }
               onClick={() =>
                 removeItem(i)
               }
               aria-label="Remove item"
+              disabled={busy}
             >
               ×
             </button>
@@ -1212,26 +1671,57 @@ function SubmissionEditor({
         ))}
       </div>
 
-      <div style={s.editorFooter}>
+      <div
+        style={s.editorFooter}
+      >
         <button
-          style={s.secondaryBtn}
+          style={{
+            ...s.secondaryBtn,
+
+            ...(busy
+              ? s.disabledBtn
+              : {}),
+          }}
           onClick={onSave}
+          disabled={busy}
         >
           Save Submission
         </button>
 
         <button
-          style={s.secondaryBtn}
+          style={{
+            ...s.secondaryBtn,
+
+            ...(busy
+              ? s.disabledBtn
+              : {}),
+          }}
           onClick={onReview}
+          disabled={busy}
         >
-          Save and Run Review
+          {busy &&
+          reviewAction ===
+            'review'
+            ? 'Reviewing…'
+            : 'Save and Run Review'}
         </button>
 
         <button
-          style={s.primaryBtn}
+          style={{
+            ...s.primaryBtn,
+
+            ...(busy
+              ? s.disabledBtn
+              : {}),
+          }}
           onClick={onFullReview}
+          disabled={busy}
         >
-          Save and Run Full Review
+          {busy &&
+          reviewAction ===
+            'full_review'
+            ? 'Reviewing…'
+            : 'Save and Run Full Review'}
         </button>
       </div>
     </div>
@@ -1243,50 +1733,69 @@ const ITEM_TYPES = [
     value: 'mandate',
     label: 'Mandate',
   },
+
   {
-    value: 'responsibility',
-    label: 'Responsibility',
+    value:
+      'responsibility',
+    label:
+      'Responsibility',
   },
+
   {
-    value: 'accountability',
-    label: 'Accountability',
+    value:
+      'accountability',
+    label:
+      'Accountability',
   },
+
   {
     value: 'ownership',
     label: 'Owns',
   },
+
   {
     value: 'boundary',
-    label: 'Does Not Own',
+    label:
+      'Does Not Own',
   },
+
   {
     value: 'activity',
     label: 'Activity',
   },
+
   {
     value: 'task',
     label: 'Task',
   },
+
   {
     value: 'function',
     label: 'Function',
   },
+
   {
     value: 'output',
     label: 'Output',
   },
+
   {
     value: 'interface',
     label: 'Interface',
   },
+
   {
     value: 'kpi',
     label: 'KPI',
   },
+
   {
-    value: 'decision_authority',
-    label: 'Decision Right',
+    value:
+      'decision_authority',
+    label:
+      'Decision Right',
   },
+
   {
     value: 'other',
     label: 'Other',
@@ -1308,7 +1817,9 @@ function Field({
         style={s.field}
         value={value}
         onChange={(e) =>
-          onChange(e.target.value)
+          onChange(
+            e.target.value
+          )
         }
       />
     </div>
@@ -1318,16 +1829,24 @@ function Field({
 function ReferencesTab() {
   const [refs, setRefs] =
     useState([]);
+
   const [file, setFile] =
     useState(null);
+
   const [title, setTitle] =
     useState('');
+
   const [type, setType] =
-    useState('company_goals');
+    useState(
+      'company_goals'
+    );
+
   const [notes, setNotes] =
     useState('');
+
   const [content, setContent] =
     useState('');
+
   const [status, setStatus] =
     useState('');
 
@@ -1403,6 +1922,7 @@ function ReferencesTab() {
       setStatus(
         'Title and reference content are required.'
       );
+
       return;
     }
 
@@ -1415,16 +1935,23 @@ function ReferencesTab() {
         '/api/references',
         {
           method: 'POST',
+
           headers: {
             'Content-Type':
               'application/json',
           },
+
           body: JSON.stringify({
             title,
-            reference_type: type,
+
+            reference_type:
+              type,
+
             content,
+
             source_filename:
               file?.name || null,
+
             notes,
           }),
         }
@@ -1467,7 +1994,9 @@ function ReferencesTab() {
         }
       >
         <div
-          style={s.sectionEyebrow}
+          style={
+            s.sectionEyebrow
+          }
         >
           COMPANY KNOWLEDGE
         </div>
@@ -1519,27 +2048,39 @@ function ReferencesTab() {
                 )
               }
             >
-              <option value="company_goals">
+              <option
+                value="company_goals"
+              >
                 Company Goals
               </option>
 
-              <option value="strategy">
+              <option
+                value="strategy"
+              >
                 Strategic Priorities
               </option>
 
-              <option value="business_plan">
+              <option
+                value="business_plan"
+              >
                 Business Plan
               </option>
 
-              <option value="functional_mandate">
+              <option
+                value="functional_mandate"
+              >
                 Functional Mandate
               </option>
 
-              <option value="operating_model">
+              <option
+                value="operating_model"
+              >
                 Operating Model
               </option>
 
-              <option value="company_reference">
+              <option
+                value="company_reference"
+              >
                 Other Reference
               </option>
             </select>
@@ -1577,7 +2118,9 @@ function ReferencesTab() {
           />
 
           <button
-            style={s.secondaryBtn}
+            style={
+              s.secondaryBtn
+            }
             onClick={() =>
               fileRef.current?.click()
             }
@@ -1666,9 +2209,7 @@ function ReferencesTab() {
 
             {r.notes && (
               <div
-                style={
-                  s.refNotes
-                }
+                style={s.refNotes}
               >
                 {r.notes}
               </div>
@@ -1694,6 +2235,7 @@ function StructureTab() {
         setTree(
           data.tree || []
         );
+
         setLoading(false);
       });
   }, []);
@@ -1703,9 +2245,7 @@ function StructureTab() {
       style={s.structureArea}
     >
       <div
-        style={
-          s.structureIntro
-        }
+        style={s.structureIntro}
       >
         Approved organization
         structure used by the OD
@@ -1761,7 +2301,9 @@ function StructureTab() {
                     s.divisionBox
                   }
                 >
-                  {division.name}
+                  {
+                    division.name
+                  }
                 </div>
 
                 {division.children
@@ -1812,14 +2354,17 @@ function HelpTab() {
       'Add the function',
       'Upload the completed PPTX or enter responsibilities manually. Add any context before extraction.',
     ],
+
     [
       'Check the extraction',
       'The agent shows every relevant submitted statement first. Edit, remove, or add items before saving.',
     ],
+
     [
       'Run the review',
       'Run a focused review or a Full Review against all saved functions, the approved structure, company references, and OD rules.',
     ],
+
     [
       'Calibrate and update',
       'Use the concise findings in the department meeting, then update the final responsibilities and save the agreed version.',
@@ -1897,7 +2442,8 @@ const s = {
   header: {
     position: 'relative',
     background: '#fff',
-    borderBottom: `1px solid ${line}`,
+    borderBottom:
+      `1px solid ${line}`,
     flexShrink: 0,
   },
 
@@ -1906,7 +2452,8 @@ const s = {
     inset: 0,
     backgroundImage:
       'radial-gradient(circle at 1px 1px, rgba(110,107,71,0.15) 1px, transparent 0)',
-    backgroundSize: '14px 14px',
+    backgroundSize:
+      '14px 14px',
     opacity: 0.5,
   },
 
@@ -1959,7 +2506,8 @@ const s = {
 
   workspace: {
     background: '#fff',
-    borderBottom: `1px solid ${line}`,
+    borderBottom:
+      `1px solid ${line}`,
     padding:
       '14px clamp(14px, 4vw, 28px)',
   },
@@ -1982,7 +2530,8 @@ const s = {
 
   sectionEyebrow: {
     fontSize: 10.5,
-    letterSpacing: '0.12em',
+    letterSpacing:
+      '0.12em',
     color: olive,
     fontWeight: 600,
     marginBottom: 3,
@@ -1997,7 +2546,8 @@ const s = {
   prepareCard: {
     marginTop: 12,
     padding: 12,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 10,
     background: parch,
   },
@@ -2011,30 +2561,37 @@ const s = {
   },
 
   fileChip: {
-    display: 'inline-flex',
+    display:
+      'inline-flex',
     maxWidth: '100%',
     padding: '7px 10px',
     borderRadius: 7,
     background: '#fff',
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     fontSize: 12.5,
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    textOverflow:
+      'ellipsis',
     whiteSpace: 'nowrap',
   },
 
   composerFileChip: {
-    alignSelf: 'flex-start',
-    margin: '0 0 6px 44px',
+    alignSelf:
+      'flex-start',
+    margin:
+      '0 0 6px 44px',
     padding: '5px 9px',
     borderRadius: 6,
     background: parch,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     fontSize: 11.5,
     maxWidth:
       'calc(100% - 60px)',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    textOverflow:
+      'ellipsis',
     whiteSpace: 'nowrap',
   },
 
@@ -2056,7 +2613,8 @@ const s = {
   commentBox: {
     width: '100%',
     minHeight: 70,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 8,
     padding: 10,
     outline: 'none',
@@ -2076,7 +2634,8 @@ const s = {
   editorCard: {
     marginTop: 14,
     padding: 14,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 10,
     background: '#fff',
   },
@@ -2108,7 +2667,8 @@ const s = {
   field: {
     width: '100%',
     minHeight: 38,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 7,
     padding: '8px 10px',
     background: parch,
@@ -2120,7 +2680,8 @@ const s = {
   longField: {
     width: '100%',
     minHeight: 72,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 7,
     padding: '9px 10px',
     background: parch,
@@ -2142,7 +2703,8 @@ const s = {
 
   itemList: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection:
+      'column',
     gap: 7,
   },
 
@@ -2156,7 +2718,8 @@ const s = {
 
   typeSelect: {
     minHeight: 42,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 7,
     padding: '7px',
     background: '#fff',
@@ -2167,7 +2730,8 @@ const s = {
   itemText: {
     width: '100%',
     minHeight: 42,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 7,
     padding: '8px 9px',
     background: parch,
@@ -2180,7 +2744,8 @@ const s = {
     width: 32,
     height: 32,
     borderRadius: 7,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     background: '#fff',
     color: brick,
     cursor: 'pointer',
@@ -2205,10 +2770,16 @@ const s = {
     cursor: 'pointer',
   },
 
+  disabledBtn: {
+    opacity: 0.55,
+    cursor: 'not-allowed',
+  },
+
   secondaryBtn: {
     background: '#fff',
     color: olive,
-    border: `1px solid ${olive}`,
+    border:
+      `1px solid ${olive}`,
     borderRadius: 7,
     padding: '8px 12px',
     fontSize: 12.5,
@@ -2228,7 +2799,8 @@ const s = {
   },
 
   smallSelect: {
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 7,
     padding: '7px 9px',
     background: parch,
@@ -2241,15 +2813,63 @@ const s = {
     background: '#fff',
     display: 'flex',
     gap: 8,
-    borderBottom: `1px solid ${line}`,
+    borderBottom:
+      `1px solid ${line}`,
     alignItems: 'center',
+  },
+
+  chatSearchRow: {
+    padding:
+      '8px clamp(14px, 4vw, 28px)',
+    background: '#fff',
+    borderBottom:
+      `1px solid ${line}`,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+  },
+
+  searchIcon: {
+    color: olive,
+    fontSize: 18,
+    lineHeight: 1,
+  },
+
+  chatSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    border:
+      `1px solid ${line}`,
+    borderRadius: 7,
+    padding: '7px 9px',
+    background: parch,
+    color: ink,
+    outline: 'none',
+    fontSize: 12.5,
+  },
+
+  clearSearchBtn: {
+    border: 'none',
+    background:
+      'transparent',
+    color: brick,
+    fontSize: 11.5,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+
+  searchCount: {
+    color: muted,
+    fontSize: 10.5,
+    whiteSpace: 'nowrap',
   },
 
   targetSelect: {
     minWidth: 0,
     flex: 1,
     maxWidth: 420,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 7,
     padding: '8px 10px',
     background: parch,
@@ -2276,7 +2896,8 @@ const s = {
     padding:
       '16px clamp(14px, 4vw, 28px)',
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection:
+      'column',
     gap: 13,
   },
 
@@ -2318,7 +2939,8 @@ const s = {
 
   assistantBubble: {
     background: '#fff',
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     color: ink,
     padding: '10px 13px',
     borderRadius:
@@ -2350,7 +2972,8 @@ const s = {
   },
 
   markdownTh: {
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     padding: '9px 10px',
     textAlign: 'left',
     verticalAlign: 'top',
@@ -2361,7 +2984,8 @@ const s = {
   },
 
   markdownTd: {
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     padding: '9px 10px',
     textAlign: 'left',
     verticalAlign: 'top',
@@ -2388,7 +3012,8 @@ const s = {
     fontFamily:
       "'Fraunces', serif",
     fontSize: 20,
-    margin: '4px 0 10px',
+    margin:
+      '4px 0 10px',
     color: ink,
   },
 
@@ -2396,19 +3021,22 @@ const s = {
     fontFamily:
       "'Fraunces', serif",
     fontSize: 18,
-    margin: '10px 0 8px',
+    margin:
+      '10px 0 8px',
     color: ink,
   },
 
   markdownH3: {
     fontSize: 14.5,
-    margin: '10px 0 6px',
+    margin:
+      '10px 0 6px',
     color: brick,
     fontWeight: 600,
   },
 
   markdownQuote: {
-    margin: '8px 0 10px',
+    margin:
+      '8px 0 10px',
     padding: '8px 10px',
     borderLeft:
       `3px solid ${olive}`,
@@ -2434,7 +3062,8 @@ const s = {
     position: 'sticky',
     bottom: 0,
     background: '#fff',
-    borderTop: `1px solid ${line}`,
+    borderTop:
+      `1px solid ${line}`,
     padding:
       '9px clamp(10px, 3vw, 20px) 12px',
     zIndex: 4,
@@ -2450,7 +3079,8 @@ const s = {
     width: 38,
     minWidth: 38,
     borderRadius: 9,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     background: parch,
     color: brick,
     fontSize: 22,
@@ -2463,7 +3093,8 @@ const s = {
     maxHeight: 110,
     padding: '11px 12px',
     borderRadius: 9,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     fontSize: 13.5,
     outline: 'none',
     background: parch,
@@ -2509,7 +3140,8 @@ const s = {
 
   referenceForm: {
     background: '#fff',
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 10,
     padding: 14,
   },
@@ -2517,7 +3149,8 @@ const s = {
   referenceContent: {
     width: '100%',
     minHeight: 190,
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 8,
     padding: 10,
     outline: 'none',
@@ -2533,7 +3166,8 @@ const s = {
 
   refCard: {
     background: '#fff',
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 9,
     padding: 11,
     marginTop: 8,
@@ -2585,7 +3219,8 @@ const s = {
 
   orgChart: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection:
+      'column',
     alignItems: 'center',
     minWidth: 'fit-content',
   },
@@ -2596,7 +3231,8 @@ const s = {
     fontFamily:
       "'Fraunces', serif",
     fontWeight: 600,
-    padding: '10px 26px',
+    padding:
+      '10px 26px',
     borderRadius: 6,
     fontSize: 15,
   },
@@ -2617,7 +3253,8 @@ const s = {
 
   divisionCol: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection:
+      'column',
     alignItems: 'center',
   },
 
@@ -2626,7 +3263,8 @@ const s = {
     color: '#fff',
     fontSize: 13,
     fontWeight: 600,
-    padding: '9px 14px',
+    padding:
+      '9px 14px',
     borderRadius: 6,
     whiteSpace: 'nowrap',
   },
@@ -2639,15 +3277,18 @@ const s = {
 
   deptStack: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection:
+      'column',
     gap: 6,
   },
 
   deptBox: {
     background: '#fff',
-    border: `1px solid ${line}`,
+    border:
+      `1px solid ${line}`,
     borderRadius: 5,
-    padding: '6px 12px',
+    padding:
+      '6px 12px',
     fontSize: 12,
     whiteSpace: 'nowrap',
     textAlign: 'center',
