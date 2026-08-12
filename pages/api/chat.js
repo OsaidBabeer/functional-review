@@ -11,10 +11,8 @@ import {
   STRUCTURE_TOOL_DEFINITION,
 } from '../../lib/structureTools';
 
-
 const REVIEW_MODEL = 'claude-sonnet-4-6';
 const CHAT_MODEL = 'claude-haiku-4-5';
-
 
 function list(value) {
   return Array.isArray(value) && value.length
@@ -22,25 +20,14 @@ function list(value) {
     : '—';
 }
 
-
 function clean(value) {
   return String(value || '').trim();
 }
-
 
 function sameText(a, b) {
   return clean(a).toLowerCase() === clean(b).toLowerCase();
 }
 
-
-/*
-  Full submission detail
-
-  Used for
-
-  1. The selected function
-  2. Every function during Full Review
-*/
 function formatFullSubmission(s) {
   return `
 ### ${s.department_function || 'Unnamed Function'} (${s.division || 'Unknown Division'})
@@ -80,17 +67,6 @@ ${s.source_filename || 'Manual entry'}
 `.trim();
 }
 
-
-/*
-  Compact submission detail
-
-  Used for other departments during
-  a normal Review.
-
-  This keeps enough information for
-  ownership and overlap checks without
-  sending every field to Claude.
-*/
 function formatCompactSubmission(s) {
   return `
 ${s.department_function || 'Unnamed Function'} (${s.division || 'Unknown Division'})
@@ -109,21 +85,6 @@ ${list(s.does_not_own).slice(0, 1200)}
 `.trim();
 }
 
-
-/*
-  Build the internal submission context
-  depending on review mode.
-
-  chat
-  Selected function only
-
-  review
-  Selected function in full
-  Other functions as compact ownership index
-
-  full_review
-  Every active function in full
-*/
 function buildSubmissionContext({
   submissions,
   mode,
@@ -195,13 +156,6 @@ ${others
     : '(No specific function selected.)';
 }
 
-
-/*
-  References are intentionally limited.
-
-  We do not want to send huge strategy
-  documents on every request.
-*/
 function buildReferenceContext(
   references,
   mode
@@ -228,10 +182,6 @@ function buildReferenceContext(
   let used = 0;
   const output = [];
 
-  /*
-    Put strategy and company goals first
-    because they matter most to OD review.
-  */
   const priority = {
     company_goals: 1,
     strategy: 2,
@@ -241,10 +191,14 @@ function buildReferenceContext(
     company_reference: 6,
   };
 
-  const sorted = [...references].sort(
+  const sorted = [
+    ...references,
+  ].sort(
     (a, b) =>
-      (priority[a.reference_type] || 99) -
-      (priority[b.reference_type] || 99)
+      (priority[a.reference_type] ||
+        99) -
+      (priority[b.reference_type] ||
+        99)
   );
 
   for (const r of sorted) {
@@ -281,26 +235,12 @@ ${content}
 `.trim();
 
     output.push(block);
-
     used += block.length;
   }
 
   return output.join('\n\n');
 }
 
-
-/*
-  Market search
-
-  Normal chat
-  No market search
-
-  Review
-  Maximum 2 searches
-
-  Full Review
-  Maximum 4 searches
-*/
 function getTools(mode) {
   const tools = [
     STRUCTURE_TOOL_DEFINITION,
@@ -319,10 +259,6 @@ function getTools(mode) {
           ? 4
           : 2,
 
-      /*
-        Direct search avoids unnecessary
-        programmatic search complexity.
-      */
       allowed_callers: [
         'direct',
       ],
@@ -340,14 +276,6 @@ function getTools(mode) {
   return tools;
 }
 
-
-/*
-  The static prompt is deliberately separated
-  from the changing company data.
-
-  This gives prompt caching a much more stable
-  reusable prefix.
-*/
 const STATIC_OD_PROMPT = `
 You are the Organizational Development review specialist for Al Balad Development Company, BDC.
 
@@ -361,9 +289,7 @@ Do not produce long reports.
 
 Your job is to identify the few issues that actually require OD attention.
 
-
 BDC OD REVIEW PRINCIPLES
-
 
 1. Review meaning, not keyword matches.
 
@@ -385,30 +311,15 @@ BDC OD REVIEW PRINCIPLES
 
 10. The approved organization structure is evidence of reporting relationships and organizational placement. A department name alone does not prove functional ownership.
 
-
 BDC OD REVIEW CHECKLIST
-
 
 MANDATE CLARITY
 
 Ask whether a new executive could understand why the function exists.
 
-A strong mandate should explain
+A strong mandate should explain purpose, value delivered, scope, and operating model role.
 
-Purpose
-
-Value delivered
-
-Scope
-
-Operating model role
-
-It should be written at function level.
-
-It should not simply list activities or services.
-
-If it is vague, broad, operational, repetitive, or missing key elements, explain what needs improvement.
-
+It should be written at function level and should not simply list activities or services.
 
 BOUNDARY CLARITY
 
@@ -424,62 +335,19 @@ Do not call something an overlap because another function has a similar name.
 
 If evidence is incomplete, use Clarify or Needs validation.
 
-
 RESPONSIBILITY QUALITY
 
 Review the major responsibilities.
 
-A strong responsibility should
+A strong responsibility should be written at department or function level, describe an accountable outcome, support the mandate, make ownership understandable, and avoid individual job duties.
 
-Be written at department or function level
-
-Describe an accountable outcome
-
-Support the mandate
-
-Make ownership understandable
-
-Avoid individual job duties
-
-Avoid weak wording such as support, assist, follow up, attend meetings, or coordinate unless the actual accountability is clear
-
-Do not criticize wording merely for style.
-
-Focus on wording that affects accountability or understanding.
-
+Avoid weak wording such as support, assist, follow up, attend meetings, or coordinate unless the actual accountability is clear.
 
 OUTPUT DISCIPLINE
 
-Outputs should be tangible products or deliverables.
-
-Examples include
-
-Plans
-
-Policies
-
-Reports
-
-Standards
-
-Registers
-
-Models
-
-Dashboards
-
-Frameworks
-
-Roadmaps
-
-Approvals
-
-Specifications
-
-Packs
+Outputs should be tangible products or deliverables such as plans, policies, reports, standards, registers, models, dashboards, frameworks, roadmaps, approvals, specifications, and packs.
 
 Do not treat generic support or coordination as a strong output unless a tangible result is identified.
-
 
 KPI QUALITY
 
@@ -487,119 +355,43 @@ This is a real quality assessment.
 
 Do not only check whether KPIs exist.
 
-Check whether each KPI is
+Check whether each KPI is clearly written, measurable, owned by the function, connected to a responsibility, connected to an output or expected result, and focused on outcome, quality, timeliness, service level, efficiency, cost, compliance, risk, or governance.
 
-Clearly written
-
-Measurable
-
-Owned by the function
-
-Connected to a responsibility
-
-Connected to an output or expected result
-
-Focused on outcome, quality, timeliness, service level, efficiency, cost, compliance, risk, or governance
-
-Not merely counting activity
-
-Weak activity examples include
-
-Number of meetings
-
-Number of emails
-
-Number of reports
-
-Number of follow ups
-
-Number of actions
-
-unless the count itself is a meaningful business outcome.
+Do not accept KPIs that merely count activity such as meetings, emails, reports, follow ups, or actions unless the count itself is a meaningful business outcome.
 
 If a KPI is weak, explain the actual problem and recommend a better KPI that fits the function.
 
-
 DECISION RIGHTS
 
-Review
+Review Recommend, Endorse or sign off, Approve, and Escalate.
 
-Recommend
-
-Endorse or sign off
-
-Approve
-
-Escalate
-
-Check whether decision authority is clear.
-
-Check whether the authority logically belongs to the function.
+Check whether decision authority is clear and logically belongs to the function.
 
 Do not claim an approval is incorrectly placed unless available evidence supports that conclusion.
-
 
 INTERFACES
 
 Check whether major internal customers, dependencies, and handoffs are clear.
 
-A strong interface should make clear
-
-Who interacts
-
-Why they interact
-
-What is provided or received
-
-Where accountability transfers
+A strong interface should make clear who interacts, why they interact, what is provided or received, and where accountability transfers.
 
 A list of department names without the nature of the relationship is not sufficient.
-
 
 SCALABILITY
 
 Check whether internal accountability is separated from external execution.
 
-External parties may include
-
-Consultants
-
-Contractors
-
-PMCs
-
-Operators
-
-Service providers
-
-Vendors
-
-Suppliers
+External parties may include consultants, contractors, PMCs, operators, service providers, vendors, and suppliers.
 
 The external party may execute the work while BDC retains accountability.
 
-
 ADDITIONAL OD CHECKS
-
 
 OWNERSHIP LOGIC
 
-Determine whether responsibilities logically belong in the function using
-
-Approved organization structure
-
-Function mandate
-
-Other active BDC submissions
-
-Company references
-
-Business context
-
-Market evidence when relevant
+Determine whether responsibilities logically belong in the function using approved organization structure, function mandate, other active BDC submissions, company references, business context, and market evidence when relevant.
 
 Do not rely on keyword similarity.
-
 
 OVERLAP RISK
 
@@ -611,23 +403,13 @@ If both functions are involved but their roles may reasonably differ, use Clarif
 
 Do not say another department likely owns something and then call it an overlap.
 
-
 GAP RISK
 
 Flag only meaningful responsibilities that BDC appears to require but that have no clear owner.
 
-Before calling something a Gap
-
-Check other active functions
-
-Check company references
-
-Check approved structure
-
-Use market evidence where relevant
+Before calling something a Gap, check other active functions, company references, approved structure, and relevant market evidence.
 
 Do not introduce a generic best practice responsibility and immediately label it a gap.
-
 
 STRATEGY ALIGNMENT
 
@@ -635,9 +417,7 @@ When company goals, strategy, business plan, operating model, or mandates are av
 
 Do not invent BDC strategic priorities.
 
-
 MARKET BENCHMARKING
-
 
 For Review and Full Review, use live web search when useful.
 
@@ -645,99 +425,31 @@ The purpose of the benchmark is not to find identical wording.
 
 The purpose is to understand how credible comparable organizations handle the same type of accountability.
 
-
 PEER SELECTION
 
 Choose peers based on the function being reviewed.
 
-Relevant peer categories may include
+Relevant peer categories may include Saudi real estate developers, master developers, destination developers, heritage destination developers, mixed use developers, tourism destination developers, large PIF portfolio companies where relevant, and property or asset management organizations where relevant.
 
-Saudi real estate developers
-
-Master developers
-
-Destination developers
-
-Heritage destination developers
-
-Mixed use developers
-
-Tourism destination developers
-
-Large PIF portfolio companies where relevant
-
-Property or asset management organizations where relevant
-
-Potential peers may include
-
-Diriyah Company
-
-Red Sea Global
-
-ROSHN Group
-
-Qiddiya
-
-New Murabba
-
-Rua Al Madinah
-
-Jeddah Central Development Company
+Potential peers may include Diriyah Company, Red Sea Global, ROSHN Group, Qiddiya, New Murabba, Rua Al Madinah, and Jeddah Central Development Company.
 
 Do not force these organizations into every review.
 
-Choose the most relevant evidence for the responsibility being assessed.
-
-
 SOURCE QUALITY
 
-Prefer
-
-Official company websites
-
-Official annual reports
-
-Official governance documents
-
-Official organizational information
-
-Government sources
-
-Regulators
-
-PIF sources
-
-Professional bodies
-
-Credible research organizations
-
-Major consulting firms when directly relevant
+Prefer official company websites, official annual reports, official governance documents, official organizational information, government sources, regulators, PIF sources, professional bodies, credible research organizations, and major consulting firms when directly relevant.
 
 Avoid weak blogs, generic SEO content, and unattributed claims.
-
 
 MARKET EVIDENCE RULES
 
 Never invent market practice.
 
-Do not say
+Do not say Best practice says, Leading organizations do, or Market benchmark is unless the evidence actually supports the statement.
 
-Best practice says
-
-Leading organizations do
-
-Market benchmark is
-
-unless the evidence actually supports the statement.
-
-If evidence is limited, say
-
-Market evidence limited.
+If evidence is limited, say Market evidence limited.
 
 Do not copy another company's structure blindly.
-
-The benchmark is evidence for OD judgement, not an instruction to duplicate another company.
-
 
 SEARCH EFFICIENCY
 
@@ -751,9 +463,7 @@ For a Full Review, use broader research only where it adds value.
 
 Do not spend searches proving obvious points.
 
-
 OUTPUT FORMAT
-
 
 For review or full_review return only
 
@@ -764,7 +474,6 @@ Then one Markdown table.
 Use exactly these columns
 
 | Check | Status | Finding | Market Benchmark | Action |
-
 
 Always include
 
@@ -784,7 +493,6 @@ Interfaces
 
 Scalability
 
-
 Only add these when meaningful
 
 Ownership logic
@@ -794,7 +502,6 @@ Overlap risk
 Gap risk
 
 Strategy alignment
-
 
 Allowed statuses
 
@@ -810,10 +517,7 @@ Gap
 
 Needs validation
 
-
 KEEP THE OUTPUT SHORT
-
-This is critical.
 
 One short sentence per cell whenever possible.
 
@@ -835,21 +539,7 @@ Action
 
 No change.
 
-
-When there is an issue
-
-Finding
-
-State exactly what is wrong.
-
-Market Benchmark
-
-State what credible comparable practice suggests.
-
-Action
-
-State exactly what should change.
-
+When there is an issue, state exactly what is wrong, what credible comparable practice suggests, and exactly what should change.
 
 MARKET SOURCES
 
@@ -859,7 +549,6 @@ Do not create a separate long source list.
 
 If market research did not materially affect a Good finding, do not waste tokens adding unnecessary citations.
 
-
 NORMAL CHAT
 
 For normal chat, answer directly and briefly.
@@ -868,7 +557,6 @@ Do not automatically run the checklist.
 
 Do not perform web searches unless the request is sent as Review or Full Review.
 `.trim();
-
 
 async function callClaude({
   dynamicContext,
@@ -886,12 +574,6 @@ async function callClaude({
       ? REVIEW_MODEL
       : CHAT_MODEL;
 
-  /*
-    Keep output tightly controlled.
-
-    Output tokens are expensive and the
-    desired review is intentionally concise.
-  */
   const maxTokens =
     isFullReview
       ? 1800
@@ -899,15 +581,6 @@ async function callClaude({
       ? 1400
       : 650;
 
-  /*
-    Lower effort saves reasoning tokens.
-
-    Normal Review is a structured checklist,
-    so low effort is usually enough.
-
-    Full Review gets medium because it must
-    compare the broader organization.
-  */
   const effort =
     isFullReview
       ? 'medium'
@@ -930,38 +603,40 @@ async function callClaude({
       },
 
       body: JSON.stringify({
-  model,
+        model,
 
-  max_tokens: maxTokens,
+        max_tokens: maxTokens,
 
-  output_config: {
-    effort,
-  },
+        output_config: {
+          effort,
+        },
 
-  cache_control: {
-    type: 'ephemeral',
-  },
+        cache_control: {
+          type: 'ephemeral',
+        },
 
-  system: [
-    {
-      type: 'text',
-      text: STATIC_OD_PROMPT,
+        system: [
+          {
+            type: 'text',
+            text: STATIC_OD_PROMPT,
 
-      cache_control: {
-        type: 'ephemeral',
-      },
-    },
+            cache_control: {
+              type: 'ephemeral',
+            },
+          },
 
-    {
-      type: 'text',
-      text: dynamicContext,
-    },
-  ],
+          {
+            type: 'text',
+            text: dynamicContext,
+          },
+        ],
 
-  tools: getTools(mode),
+        tools: getTools(mode),
 
-  messages,
-}),
+        messages,
+      }),
+    }
+  );
 
   const data =
     await response.json();
@@ -976,19 +651,17 @@ async function callClaude({
   return data;
 }
 
-
-function escapeMarkdownLabel(value) {
+function escapeMarkdownLabel(
+  value
+) {
   return String(value || '')
     .replace(/\[/g, '\\[')
     .replace(/\]/g, '\\]');
 }
 
-
-/*
-  Convert Claude web citations to clickable
-  Markdown links for ReactMarkdown.
-*/
-function renderClaudeContent(content) {
+function renderClaudeContent(
+  content
+) {
   if (!Array.isArray(content)) {
     return '';
   }
@@ -1006,12 +679,17 @@ function renderClaudeContent(content) {
     let text = block.text;
 
     if (
-      Array.isArray(block.citations) &&
+      Array.isArray(
+        block.citations
+      ) &&
       block.citations.length
     ) {
       const uniqueSources = [];
 
-      for (const citation of block.citations) {
+      for (
+        const citation
+        of block.citations
+      ) {
         if (
           citation.type !==
             'web_search_result_location' ||
@@ -1023,7 +701,8 @@ function renderClaudeContent(content) {
         const alreadyAdded =
           uniqueSources.some(
             (source) =>
-              source.url === citation.url
+              source.url ===
+              citation.url
           );
 
         if (!alreadyAdded) {
@@ -1038,7 +717,9 @@ function renderClaudeContent(content) {
         }
       }
 
-      if (uniqueSources.length) {
+      if (
+        uniqueSources.length
+      ) {
         const links =
           uniqueSources
             .slice(0, 2)
@@ -1059,7 +740,6 @@ function renderClaudeContent(content) {
 
   return output.join('');
 }
-
 
 export default async function handler(
   req,
@@ -1116,9 +796,6 @@ export default async function handler(
     ];
 
   try {
-    /*
-      Save user message
-    */
     await supabase
       .from('chat_messages')
       .insert({
@@ -1131,10 +808,6 @@ export default async function handler(
           author || null,
       });
 
-
-    /*
-      Load the system knowledge in parallel
-    */
     const [
       submissionsResult,
       rulesResult,
@@ -1163,7 +836,6 @@ export default async function handler(
         }),
     ]);
 
-
     const submissions =
       submissionsResult.data ||
       [];
@@ -1176,10 +848,6 @@ export default async function handler(
       referencesResult.data ||
       [];
 
-
-    /*
-      Approved organization structure
-    */
     const structureTree =
       await getStructureTree();
 
@@ -1188,11 +856,6 @@ export default async function handler(
         structureTree
       );
 
-
-    /*
-      Only send the amount of submission
-      detail needed for this request.
-    */
     const submissionContext =
       buildSubmissionContext({
         submissions,
@@ -1200,17 +863,11 @@ export default async function handler(
         targetFunction,
       });
 
-
-    /*
-      Limit company reference text to
-      prevent huge token usage.
-    */
     const referenceContext =
       buildReferenceContext(
         references,
         mode
       );
-
 
     const rulesBlock =
       rules.length
@@ -1222,22 +879,14 @@ export default async function handler(
             .join('\n')
         : '(No saved OD rules.)';
 
-
-    /*
-      Dynamic content changes from review
-      to review and therefore sits after the
-      cached static prompt.
-    */
     const dynamicContext = `
 BDC BUSINESS CONTEXT
 
 ${COMPANY_CONTEXT}
 
-
 APPROVED BDC ORGANIZATION STRUCTURE
 
 ${structureText}
-
 
 CURRENT REQUEST
 
@@ -1253,31 +902,19 @@ ${targetDivision || 'Not specified'}
 User comment or context
 ${userContext || '—'}
 
-
 SAVED OD RULES
 
 ${rulesBlock}
 
-
 COMPANY REFERENCES
 
 ${referenceContext}
-
 
 FUNCTION SUBMISSION CONTEXT
 
 ${submissionContext}
 `.trim();
 
-
-    /*
-      Do not send unlimited chat history.
-
-      Chat gets the latest 6 messages.
-
-      Review requests only need the latest
-      request and immediate context.
-    */
     const historyLimit =
       mode === 'chat'
         ? 6
@@ -1292,25 +929,18 @@ ${submissionContext}
       recentMessages.map(
         (m) => ({
           role: m.role,
-
-          content:
-            m.content,
+          content: m.content,
         })
       );
-
 
     let data =
       await callClaude({
         dynamicContext,
-        messages: conversation,
+        messages:
+          conversation,
         mode,
       });
 
-
-    /*
-      Handle client side structure tool
-      and Anthropic pause_turn responses.
-    */
     let guard = 0;
 
     while (
@@ -1324,11 +954,6 @@ ${submissionContext}
     ) {
       guard += 1;
 
-
-      /*
-        Server side web search can pause
-        a turn while Claude continues.
-      */
       if (
         data.stop_reason ===
         'pause_turn'
@@ -1348,21 +973,16 @@ ${submissionContext}
         data =
           await callClaude({
             dynamicContext,
+
             messages:
               conversation,
+
             mode,
           });
 
         continue;
       }
 
-
-      /*
-        Handle our custom org structure tool.
-
-        Ignore server web search blocks because
-        Anthropic executes those itself.
-      */
       const customToolBlocks =
         data.content?.filter(
           (block) =>
@@ -1372,16 +992,13 @@ ${submissionContext}
               'web_search'
         ) || [];
 
-
       if (
         !customToolBlocks.length
       ) {
         break;
       }
 
-
       const toolResults = [];
-
 
       for (
         const toolBlock
@@ -1422,7 +1039,6 @@ ${submissionContext}
         }
       }
 
-
       conversation = [
         ...conversation,
 
@@ -1443,7 +1059,6 @@ ${submissionContext}
         },
       ];
 
-
       data =
         await callClaude({
           dynamicContext,
@@ -1455,12 +1070,10 @@ ${submissionContext}
         });
     }
 
-
     let replyText =
       renderClaudeContent(
         data.content
       );
-
 
     if (!replyText.trim()) {
       replyText =
@@ -1468,10 +1081,6 @@ ${submissionContext}
         'No response returned.';
     }
 
-
-    /*
-      Save assistant response
-    */
     await supabase
       .from('chat_messages')
       .insert({
@@ -1482,14 +1091,6 @@ ${submissionContext}
           replyText,
       });
 
-
-    /*
-      Return usage information too.
-
-      This is useful because later we can
-      display actual token usage and search
-      count in an Admin cost panel.
-    */
     return res
       .status(200)
       .json({
