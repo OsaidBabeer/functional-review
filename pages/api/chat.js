@@ -930,55 +930,38 @@ async function callClaude({
       },
 
       body: JSON.stringify({
-        model,
+  model,
 
-        max_tokens: maxTokens,
+  max_tokens: maxTokens,
 
-        effort,
+  output_config: {
+    effort,
+  },
 
-        /*
-          Automatic prompt caching
+  cache_control: {
+    type: 'ephemeral',
+  },
 
-          Default TTL is 5 minutes.
+  system: [
+    {
+      type: 'text',
+      text: STATIC_OD_PROMPT,
 
-          This is useful during testing and
-          OD meetings where reviews are run
-          close together.
-        */
-        cache_control: {
-          type: 'ephemeral',
-        },
+      cache_control: {
+        type: 'ephemeral',
+      },
+    },
 
-        /*
-          Static instructions get their own
-          explicit cache point.
+    {
+      type: 'text',
+      text: dynamicContext,
+    },
+  ],
 
-          Dynamic BDC data is placed after it,
-          so changes to submissions do not
-          invalidate the static OD prompt.
-        */
-        system: [
-          {
-            type: 'text',
-            text: STATIC_OD_PROMPT,
+  tools: getTools(mode),
 
-            cache_control: {
-              type: 'ephemeral',
-            },
-          },
-
-          {
-            type: 'text',
-            text: dynamicContext,
-          },
-        ],
-
-        tools: getTools(mode),
-
-        messages,
-      }),
-    }
-  );
+  messages,
+}),
 
   const data =
     await response.json();
