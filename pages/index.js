@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import JSZip from 'jszip';
 import ReactMarkdown from 'react-markdown';
@@ -17,7 +17,7 @@ const muted = '#857D68';
 const WELCOME = {
   role: 'assistant',
   content:
-    'Upload a functional review or enter responsibilities manually. I can check ownership, real overlaps, gaps, and structure alignment.',
+    'Upload a functional review or enter responsibilities manually. I can check ownership, real overlaps, gaps, structure alignment, and market benchmarks.',
 };
 
 const EMPTY_SUBMISSION = {
@@ -80,14 +80,15 @@ export default function Home() {
         textarea {
           resize: vertical;
         }
+
+        a {
+          word-break: break-word;
+        }
       `}</style>
 
       <div style={s.page}>
         <header style={s.header}>
-          <div
-            style={s.pattern}
-            aria-hidden="true"
-          />
+          <div style={s.pattern} aria-hidden="true" />
 
           <div style={s.headerInner}>
             <div>
@@ -104,81 +105,54 @@ export default function Home() {
           <nav style={s.tabRow}>
             <TabButton
               active={tab === 'help'}
-              onClick={() =>
-                setTab('help')
-              }
+              onClick={() => setTab('help')}
             >
               How It Works
             </TabButton>
 
             <TabButton
               active={tab === 'review'}
-              onClick={() =>
-                setTab('review')
-              }
+              onClick={() => setTab('review')}
             >
               Function Review
             </TabButton>
 
             <TabButton
               active={tab === 'references'}
-              onClick={() =>
-                setTab('references')
-              }
+              onClick={() => setTab('references')}
             >
               Company References
             </TabButton>
 
             <TabButton
               active={tab === 'structure'}
-              onClick={() =>
-                setTab('structure')
-              }
+              onClick={() => setTab('structure')}
             >
               Structure
             </TabButton>
           </nav>
         </header>
 
-        {tab === 'help' && (
-          <HelpTab />
-        )}
-
-        {tab === 'review' && (
-          <ReviewTab />
-        )}
-
-        {tab === 'references' && (
-          <ReferencesTab />
-        )}
-
-        {tab === 'structure' && (
-          <StructureTab />
-        )}
+        {tab === 'help' && <HelpTab />}
+        {tab === 'review' && <ReviewTab />}
+        {tab === 'references' && <ReferencesTab />}
+        {tab === 'structure' && <StructureTab />}
       </div>
     </>
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}) {
+function TabButton({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
       style={{
         ...s.tabBtn,
-        color: active
-          ? brick
-          : '#8a8266',
+        color: active ? brick : '#8a8266',
         borderBottom: active
           ? `2px solid ${brick}`
           : '2px solid transparent',
-        fontWeight: active
-          ? 600
-          : 500,
+        fontWeight: active ? 600 : 500,
       }}
     >
       {children}
@@ -186,51 +160,29 @@ function TabButton({
   );
 }
 
-async function extractSlidesFromPptx(
-  file
-) {
-  const zip =
-    await JSZip.loadAsync(file);
+async function extractSlidesFromPptx(file) {
+  const zip = await JSZip.loadAsync(file);
 
-  const slideFiles = Object.keys(
-    zip.files
-  )
-    .filter((name) =>
-      /^ppt\/slides\/slide\d+\.xml$/.test(
-        name
-      )
-    )
+  const slideFiles = Object.keys(zip.files)
+    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
     .sort(
       (a, b) =>
-        parseInt(
-          a.match(/\d+/)[0],
-          10
-        ) -
-        parseInt(
-          b.match(/\d+/)[0],
-          10
-        )
+        parseInt(a.match(/\d+/)[0], 10) -
+        parseInt(b.match(/\d+/)[0], 10)
     );
 
   const texts = [];
 
   for (const name of slideFiles) {
-    const xml =
-      await zip.files[
-        name
-      ].async('string');
+    const xml = await zip.files[name].async('string');
 
     const matches = [
-      ...xml.matchAll(
-        /<a:t>(.*?)<\/a:t>/gs
-      ),
+      ...xml.matchAll(/<a:t>(.*?)<\/a:t>/gs),
     ];
 
     texts.push(
       matches
-        .map((m) =>
-          decodeXml(m[1])
-        )
+        .map((m) => decodeXml(m[1]))
         .join(' ')
     );
   }
@@ -238,9 +190,7 @@ async function extractSlidesFromPptx(
   return texts
     .map(
       (t, i) =>
-        `--- Slide ${
-          i + 1
-        } ---\n${t}`
+        `--- Slide ${i + 1} ---\n${t}`
     )
     .join('\n\n');
 }
@@ -254,18 +204,11 @@ function decodeXml(value) {
     .replace(/&apos;/g, "'");
 }
 
-async function readReferenceFile(
-  file
-) {
-  const lower =
-    file.name.toLowerCase();
+async function readReferenceFile(file) {
+  const lower = file.name.toLowerCase();
 
-  if (
-    lower.endsWith('.pptx')
-  ) {
-    return extractSlidesFromPptx(
-      file
-    );
+  if (lower.endsWith('.pptx')) {
+    return extractSlidesFromPptx(file);
   }
 
   if (
@@ -282,96 +225,44 @@ async function readReferenceFile(
 }
 
 function ReviewTab() {
-  const [messages, setMessages] =
-    useState([WELCOME]);
-
-  const [input, setInput] =
-    useState('');
-
-  const [sending, setSending] =
-    useState(false);
-
-  const [status, setStatus] =
-    useState('');
-
-  const [file, setFile] =
-    useState(null);
-
-  const [rawText, setRawText] =
-    useState('');
-
-  const [
-    userComment,
-    setUserComment,
-  ] = useState('');
-
-  const [drafts, setDrafts] =
-    useState([]);
-
-  const [
-    draftIndex,
-    setDraftIndex,
-  ] = useState(0);
-
-  const [
-    manualMode,
-    setManualMode,
-  ] = useState(false);
-
-  const [
-    savedSubmissions,
-    setSavedSubmissions,
-  ] = useState([]);
-
-  const [
-    selectedTarget,
-    setSelectedTarget,
-  ] = useState('');
-
-  const [
-    searchQuery,
-    setSearchQuery,
-  ] = useState('');
-
-  const [
-    reviewAction,
-    setReviewAction,
-  ] = useState('');
+  const [messages, setMessages] = useState([WELCOME]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState('');
+  const [file, setFile] = useState(null);
+  const [rawText, setRawText] = useState('');
+  const [userComment, setUserComment] = useState('');
+  const [drafts, setDrafts] = useState([]);
+  const [draftIndex, setDraftIndex] = useState(0);
+  const [manualMode, setManualMode] = useState(false);
+  const [savedSubmissions, setSavedSubmissions] = useState([]);
+  const [selectedTarget, setSelectedTarget] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [reviewAction, setReviewAction] = useState('');
 
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
 
-  const draft =
-    drafts[draftIndex] || null;
+  const draft = drafts[draftIndex] || null;
 
-  const normalizedSearch =
-    searchQuery
-      .trim()
-      .toLowerCase();
+  const normalizedSearch = searchQuery
+    .trim()
+    .toLowerCase();
 
-  const visibleMessages =
-    normalizedSearch
-      ? messages.filter((m) =>
-          String(
-            m.content || ''
-          )
-            .toLowerCase()
-            .includes(
-              normalizedSearch
-            )
-        )
-      : messages;
+  const visibleMessages = normalizedSearch
+    ? messages.filter((m) =>
+        String(m.content || '')
+          .toLowerCase()
+          .includes(normalizedSearch)
+      )
+    : messages;
 
   useEffect(() => {
     fetch('/api/chat-history')
       .then((r) => r.json())
       .then((data) => {
-        if (
-          data.messages?.length
-        ) {
-          setMessages(
-            data.messages
-          );
+        if (data.messages?.length) {
+          setMessages(data.messages);
         }
       })
       .catch(() => {});
@@ -381,33 +272,24 @@ function ReviewTab() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
-      top:
-        scrollRef.current
-          .scrollHeight,
+      top: scrollRef.current.scrollHeight,
       behavior: 'smooth',
     });
   }, [messages, sending]);
 
   async function refreshSubmissions() {
     try {
-      const res = await fetch(
-        '/api/submissions'
-      );
+      const res = await fetch('/api/submissions');
+      const data = await res.json();
 
-      const data =
-        await res.json();
-
-      setSavedSubmissions(
-        data.submissions || []
-      );
+      setSavedSubmissions(data.submissions || []);
     } catch (_) {}
   }
 
   function selectedSubmission() {
     return savedSubmissions.find(
       (x) =>
-        String(x.id) ===
-        String(selectedTarget)
+        String(x.id) === String(selectedTarget)
     );
   }
 
@@ -416,12 +298,7 @@ function ReviewTab() {
     mode = 'chat',
     overrideTarget = null
   ) {
-    if (
-      !text.trim() ||
-      sending
-    ) {
-      return;
-    }
+    if (!text.trim() || sending) return;
 
     const newMessages = [
       ...messages,
@@ -444,45 +321,37 @@ function ReviewTab() {
     );
 
     const target =
-      overrideTarget ||
-      selectedSubmission();
+      overrideTarget || selectedSubmission();
 
     try {
-      const res = await fetch(
-        '/api/chat',
-        {
-          method: 'POST',
+      const res = await fetch('/api/chat', {
+        method: 'POST',
 
-          headers: {
-            'Content-Type':
-              'application/json',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+
+        body: JSON.stringify({
+          messages: newMessages,
+
+          review_context: {
+            mode,
+
+            target_department_function:
+              target?.department_function || null,
+
+            target_division:
+              target?.division || null,
+
+            user_comment:
+              userComment ||
+              target?.user_comments ||
+              '',
           },
+        }),
+      });
 
-          body: JSON.stringify({
-            messages: newMessages,
-
-            review_context: {
-              mode,
-
-              target_department_function:
-                target?.department_function ||
-                null,
-
-              target_division:
-                target?.division ||
-                null,
-
-              user_comment:
-                userComment ||
-                target?.user_comments ||
-                '',
-            },
-          }),
-        }
-      );
-
-      const data =
-        await res.json();
+      const data = await res.json();
 
       setMessages([
         ...newMessages,
@@ -509,8 +378,7 @@ function ReviewTab() {
   }
 
   function handleFileChosen(e) {
-    const chosen =
-      e.target.files?.[0];
+    const chosen = e.target.files?.[0];
 
     if (!chosen) return;
 
@@ -530,15 +398,11 @@ function ReviewTab() {
   async function extractDocument() {
     if (!file) return;
 
-    setStatus(
-      `Reading ${file.name}…`
-    );
+    setStatus(`Reading ${file.name}…`);
 
     try {
       const text =
-        await extractSlidesFromPptx(
-          file
-        );
+        await extractSlidesFromPptx(file);
 
       setRawText(text);
 
@@ -546,28 +410,21 @@ function ReviewTab() {
         `Extracting responsibilities from ${file.name}…`
       );
 
-      const res = await fetch(
-        '/api/extract',
-        {
-          method: 'POST',
+      const res = await fetch('/api/extract', {
+        method: 'POST',
 
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
+        headers: {
+          'Content-Type': 'application/json',
+        },
 
-          body: JSON.stringify({
-            raw_text: text,
-            source_filename:
-              file.name,
-            user_comment:
-              userComment,
-          }),
-        }
-      );
+        body: JSON.stringify({
+          raw_text: text,
+          source_filename: file.name,
+          user_comment: userComment,
+        }),
+      });
 
-      const data =
-        await res.json();
+      const data = await res.json();
 
       if (!res.ok) {
         throw new Error(
@@ -576,34 +433,24 @@ function ReviewTab() {
         );
       }
 
-      if (
-        !data.submissions?.length
-      ) {
+      if (!data.submissions?.length) {
         throw new Error(
           'No completed department submission was found in this file.'
         );
       }
 
-      setDrafts(
-        data.submissions
-      );
-
+      setDrafts(data.submissions);
       setDraftIndex(0);
 
       setStatus(
-        `Extracted ${
-          data.submissions.length
-        } submission${
-          data.submissions
-            .length === 1
+        `Extracted ${data.submissions.length} submission${
+          data.submissions.length === 1
             ? ''
             : 's'
         }. Review the statements before saving.`
       );
     } catch (err) {
-      setStatus(
-        `Error. ${err.message}`
-      );
+      setStatus(`Error. ${err.message}`);
     }
   }
 
@@ -645,13 +492,9 @@ function ReviewTab() {
     );
   }
 
-  function updateItem(
-    index,
-    patch
-  ) {
+  function updateItem(index, patch) {
     const items = [
-      ...(draft?.extracted_items ||
-        []),
+      ...(draft?.extracted_items || []),
     ];
 
     items[index] = {
@@ -667,10 +510,7 @@ function ReviewTab() {
   function removeItem(index) {
     updateDraft({
       extracted_items:
-        (
-          draft?.extracted_items ||
-          []
-        ).filter(
+        (draft?.extracted_items || []).filter(
           (_, i) => i !== index
         ),
     });
@@ -679,8 +519,7 @@ function ReviewTab() {
   function addItem() {
     updateDraft({
       extracted_items: [
-        ...(draft?.extracted_items ||
-          []),
+        ...(draft?.extracted_items || []),
 
         {
           type: 'responsibility',
@@ -690,15 +529,11 @@ function ReviewTab() {
     });
   }
 
-  function normalizeDraftForSave(
-    d
-  ) {
+  function normalizeDraftForSave(d) {
     const cleanItems = (
       d.extracted_items || []
     )
-      .filter((x) =>
-        x.text?.trim()
-      )
+      .filter((x) => x.text?.trim())
       .map((x) => ({
         type:
           x.type ||
@@ -766,12 +601,10 @@ function ReviewTab() {
     runAfter = false,
     full = false
   ) {
-    if (!draft) return;
+    if (!draft || sending) return;
 
     const normalized =
-      normalizeDraftForSave(
-        draft
-      );
+      normalizeDraftForSave(draft);
 
     if (
       !normalized.division.trim() ||
@@ -784,9 +617,7 @@ function ReviewTab() {
       return;
     }
 
-    setStatus(
-      'Saving submission…'
-    );
+    setStatus('Saving submission…');
 
     try {
       const res = await fetch(
@@ -800,8 +631,7 @@ function ReviewTab() {
           },
 
           body: JSON.stringify({
-            submission:
-              normalized,
+            submission: normalized,
 
             raw_text: rawText,
 
@@ -814,8 +644,7 @@ function ReviewTab() {
         }
       );
 
-      const data =
-        await res.json();
+      const data = await res.json();
 
       if (!res.ok) {
         throw new Error(
@@ -824,23 +653,19 @@ function ReviewTab() {
         );
       }
 
-      setStatus(
-        'Submission saved.'
-      );
+      setStatus('Submission saved.');
 
       await refreshSubmissions();
 
       setSelectedTarget(
-        String(
-          data.submission.id
-        )
+        String(data.submission.id)
       );
 
       if (runAfter) {
         await sendMessage(
           full
-            ? `Run a full OD review for ${normalized.department_function}. Compare it against everything available in the system.`
-            : `Review ${normalized.department_function}. Show only meaningful findings that need OD attention.`,
+            ? `Run a full OD review for ${normalized.department_function}. Compare it against everything available in the system and relevant market peers.`
+            : `Review ${normalized.department_function}. Show the OD checklist with only meaningful findings and relevant market benchmarks.`,
 
           full
             ? 'full_review'
@@ -850,20 +675,20 @@ function ReviewTab() {
         );
       }
     } catch (err) {
-      setStatus(
-        `Error. ${err.message}`
-      );
+      setStatus(`Error. ${err.message}`);
     }
   }
 
   function runFullReview() {
+    if (sending) return;
+
     const target =
       selectedSubmission();
 
     sendMessage(
       target
-        ? `Run a full OD review for ${target.department_function}. Compare it against everything available in the system.`
-        : 'Run a full OD review across all active functions and everything available in the system.',
+        ? `Run a full OD review for ${target.department_function}. Compare it against everything available in the system and relevant market peers.`
+        : 'Run a full OD review across all active functions, company references, approved structure, and relevant market peers.',
 
       'full_review'
     );
@@ -872,65 +697,42 @@ function ReviewTab() {
   return (
     <div style={s.reviewLayout}>
       <div style={s.workspace}>
-        <div
-          style={
-            s.workspaceHeader
-          }
-        >
+        <div style={s.workspaceHeader}>
           <div>
-            <div
-              style={
-                s.sectionEyebrow
-              }
-            >
+            <div style={s.sectionEyebrow}>
               WORKSPACE
             </div>
 
-            <div
-              style={
-                s.workspaceTitle
-              }
-            >
-              Prepare the function
-              before review
+            <div style={s.workspaceTitle}>
+              Prepare the function before review
             </div>
           </div>
 
-          <div
-            style={
-              s.workspaceActions
-            }
-          >
+          <div style={s.workspaceActions}>
             <input
               type="file"
               accept=".pptx"
               ref={fileRef}
-              onChange={
-                handleFileChosen
-              }
+              onChange={handleFileChosen}
               style={{
                 display: 'none',
               }}
             />
 
             <button
-              style={
-                s.secondaryBtn
-              }
+              style={s.secondaryBtn}
               onClick={() =>
                 fileRef.current?.click()
               }
+              disabled={sending}
             >
               Attach PPTX
             </button>
 
             <button
-              style={
-                s.secondaryBtn
-              }
-              onClick={
-                startManual
-              }
+              style={s.secondaryBtn}
+              onClick={startManual}
+              disabled={sending}
             >
               Manual Entry
             </button>
@@ -940,18 +742,10 @@ function ReviewTab() {
         {(file ||
           manualMode ||
           draft) && (
-          <div
-            style={s.prepareCard}
-          >
+          <div style={s.prepareCard}>
             {file && (
-              <div
-                style={
-                  s.fileChipRow
-                }
-              >
-                <div
-                  style={s.fileChip}
-                >
+              <div style={s.fileChipRow}>
+                <div style={s.fileChip}>
                   📄 {file.name}
                 </div>
 
@@ -963,55 +757,46 @@ function ReviewTab() {
                     setRawText('');
                     setStatus('');
                   }}
+                  disabled={sending}
                 >
                   Remove
                 </button>
               </div>
             )}
 
-            <label
-              style={s.label}
-            >
-              Comments or
-              instructions
+            <label style={s.label}>
+              Comments or instructions
             </label>
 
             <textarea
-              style={
-                s.commentBox
-              }
-              value={
-                userComment
-              }
+              style={s.commentBox}
+              value={userComment}
               onChange={(e) =>
                 setUserComment(
                   e.target.value
                 )
               }
-              placeholder={
-                'Optional. Example: “This responsibility was requested by the CEO” or “Focus on the boundary with Commercial”.'
-              }
+              placeholder='Optional. Example: “This responsibility was requested by the CEO” or “Focus on the boundary with Commercial”.'
+              disabled={sending}
             />
 
-            {file &&
-              !draft && (
-                <button
-                  style={
-                    s.primaryBtn
-                  }
-                  onClick={
-                    extractDocument
-                  }
-                >
-                  Extract
-                  Responsibilities
-                </button>
-              )}
+            {file && !draft && (
+              <button
+                style={{
+                  ...s.primaryBtn,
+                  ...(sending
+                    ? s.disabledBtn
+                    : {}),
+                }}
+                onClick={extractDocument}
+                disabled={sending}
+              >
+                Extract Responsibilities
+              </button>
+            )}
 
             {status && (
-              <div
-                style={s.status}
-              >
+              <div style={s.status}>
                 {status}
               </div>
             )}
@@ -1021,57 +806,32 @@ function ReviewTab() {
         {draft && (
           <SubmissionEditor
             draft={draft}
-            updateDraft={
-              updateDraft
-            }
-            updateItem={
-              updateItem
-            }
-            removeItem={
-              removeItem
-            }
+            updateDraft={updateDraft}
+            updateItem={updateItem}
+            removeItem={removeItem}
             addItem={addItem}
             drafts={drafts}
-            draftIndex={
-              draftIndex
-            }
-            setDraftIndex={
-              setDraftIndex
-            }
+            draftIndex={draftIndex}
+            setDraftIndex={setDraftIndex}
             onSave={() =>
-              saveDraft(
-                false,
-                false
-              )
+              saveDraft(false, false)
             }
             onReview={() =>
-              saveDraft(
-                true,
-                false
-              )
+              saveDraft(true, false)
             }
             onFullReview={() =>
-              saveDraft(
-                true,
-                true
-              )
+              saveDraft(true, true)
             }
             busy={sending}
-            reviewAction={
-              reviewAction
-            }
+            reviewAction={reviewAction}
           />
         )}
       </div>
 
-      <div
-        style={s.reviewToolbar}
-      >
+      <div style={s.reviewToolbar}>
         <select
           style={s.targetSelect}
-          value={
-            selectedTarget
-          }
+          value={selectedTarget}
           onChange={(e) =>
             setSelectedTarget(
               e.target.value
@@ -1089,9 +849,7 @@ function ReviewTab() {
                 key={x.id}
                 value={x.id}
               >
-                {
-                  x.department_function
-                }{' '}
+                {x.department_function}{' '}
                 · {x.division}
               </option>
             )
@@ -1105,9 +863,7 @@ function ReviewTab() {
               ? s.disabledBtn
               : {}),
           }}
-          onClick={
-            runFullReview
-          }
+          onClick={runFullReview}
           disabled={sending}
         >
           {sending &&
@@ -1118,19 +874,13 @@ function ReviewTab() {
         </button>
       </div>
 
-      <div
-        style={s.chatSearchRow}
-      >
-        <span
-          style={s.searchIcon}
-        >
+      <div style={s.chatSearchRow}>
+        <span style={s.searchIcon}>
           ⌕
         </span>
 
         <input
-          style={
-            s.chatSearchInput
-          }
+          style={s.chatSearchInput}
           value={searchQuery}
           onChange={(e) =>
             setSearchQuery(
@@ -1142,9 +892,7 @@ function ReviewTab() {
 
         {searchQuery && (
           <button
-            style={
-              s.clearSearchBtn
-            }
+            style={s.clearSearchBtn}
             onClick={() =>
               setSearchQuery('')
             }
@@ -1153,9 +901,7 @@ function ReviewTab() {
           </button>
         )}
 
-        <span
-          style={s.searchCount}
-        >
+        <span style={s.searchCount}>
           {normalizedSearch
             ? `${visibleMessages.length} found`
             : ''}
@@ -1181,11 +927,7 @@ function ReviewTab() {
             >
               {m.role ===
                 'assistant' && (
-                <div
-                  style={
-                    s.avatar
-                  }
-                >
+                <div style={s.avatar}>
                   OD
                 </div>
               )}
@@ -1204,6 +946,22 @@ function ReviewTab() {
                       remarkGfm,
                     ]}
                     components={{
+                      a: ({
+                        children,
+                        href,
+                      }) => (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={
+                            s.markdownLink
+                          }
+                        >
+                          {children}
+                        </a>
+                      ),
+
                       table: ({
                         children,
                       }) => (
@@ -1362,31 +1120,19 @@ function ReviewTab() {
         )}
 
         {sending && (
-          <div
-            style={s.bubbleRow}
-          >
-            <div
-              style={s.avatar}
-            >
+          <div style={s.bubbleRow}>
+            <div style={s.avatar}>
               OD
             </div>
 
-            <div
-              style={
-                s.assistantBubble
-              }
-            >
-              <span
-                style={
-                  s.thinking
-                }
-              >
+            <div style={s.assistantBubble}>
+              <span style={s.thinking}>
                 {reviewAction ===
                 'full_review'
-                  ? 'Running full OD review…'
+                  ? 'Running full OD review and market benchmark…'
                   : reviewAction ===
                     'review'
-                  ? 'Running OD checklist review…'
+                  ? 'Running OD checklist and market benchmark…'
                   : 'Working…'}
               </span>
             </div>
@@ -1394,9 +1140,7 @@ function ReviewTab() {
         )}
       </div>
 
-      <div
-        style={s.composerWrap}
-      >
+      <div style={s.composerWrap}>
         {file && (
           <div
             style={
@@ -1414,6 +1158,7 @@ function ReviewTab() {
               fileRef.current?.click()
             }
             title="Attach submission"
+            disabled={sending}
           >
             ＋
           </button>
@@ -1422,25 +1167,21 @@ function ReviewTab() {
             style={s.input}
             value={input}
             rows={1}
-            placeholder="Ask about ownership, overlaps, gaps, or add context…"
+            placeholder="Ask about ownership, overlaps, gaps, benchmark, or add context…"
             onChange={(e) =>
-              setInput(
-                e.target.value
-              )
+              setInput(e.target.value)
             }
             onKeyDown={(e) => {
               if (
-                e.key ===
-                  'Enter' &&
+                e.key === 'Enter' &&
                 !e.shiftKey
               ) {
                 e.preventDefault();
 
-                sendMessage(
-                  input
-                );
+                sendMessage(input);
               }
             }}
+            disabled={sending}
           />
 
           <button
@@ -1482,23 +1223,14 @@ function SubmissionEditor({
 }) {
   return (
     <div style={s.editorCard}>
-      <div
-        style={s.editorHeader}
-      >
+      <div style={s.editorHeader}>
         <div>
-          <div
-            style={
-              s.sectionEyebrow
-            }
-          >
+          <div style={s.sectionEyebrow}>
             EXTRACTED SUBMISSION
           </div>
 
-          <div
-            style={s.editorTitle}
-          >
-            Check what the AI
-            captured
+          <div style={s.editorTitle}>
+            Check what the AI captured
           </div>
         </div>
 
@@ -1513,6 +1245,7 @@ function SubmissionEditor({
                 )
               )
             }
+            disabled={busy}
           >
             {drafts.map(
               (d, i) => (
@@ -1521,9 +1254,7 @@ function SubmissionEditor({
                   value={i}
                 >
                   {d.department_function ||
-                    `Submission ${
-                      i + 1
-                    }`}
+                    `Submission ${i + 1}`}
                 </option>
               )
             )}
@@ -1534,15 +1265,13 @@ function SubmissionEditor({
       <div style={s.twoCol}>
         <Field
           label="Division"
-          value={
-            draft.division ||
-            ''
-          }
+          value={draft.division || ''}
           onChange={(v) =>
             updateDraft({
               division: v,
             })
           }
+          disabled={busy}
         />
 
         <Field
@@ -1557,12 +1286,12 @@ function SubmissionEditor({
                 v,
             })
           }
+          disabled={busy}
         />
       </div>
 
       <label style={s.label}>
-        Functional statement or
-        mandate
+        Functional statement or mandate
       </label>
 
       <textarea
@@ -1577,24 +1306,17 @@ function SubmissionEditor({
               e.target.value,
           })
         }
+        disabled={busy}
       />
 
-      <div
-        style={s.itemsHeader}
-      >
+      <div style={s.itemsHeader}>
         <div>
           <div style={s.label}>
             Extracted statements
           </div>
 
-          <div
-            style={s.helperText}
-          >
-            Edit, remove, or add
-            anything before the
-            review. This is the
-            audit list the agent
-            will use.
+          <div style={s.helperText}>
+            Edit, remove, or add anything before the review.
           </div>
         </div>
 
@@ -1643,9 +1365,7 @@ function SubmissionEditor({
             <textarea
               style={s.itemText}
               rows={2}
-              value={
-                item.text || ''
-              }
+              value={item.text || ''}
               onChange={(e) =>
                 updateItem(i, {
                   text: e.target
@@ -1656,9 +1376,7 @@ function SubmissionEditor({
             />
 
             <button
-              style={
-                s.removeBtn
-              }
+              style={s.removeBtn}
               onClick={() =>
                 removeItem(i)
               }
@@ -1671,13 +1389,10 @@ function SubmissionEditor({
         ))}
       </div>
 
-      <div
-        style={s.editorFooter}
-      >
+      <div style={s.editorFooter}>
         <button
           style={{
             ...s.secondaryBtn,
-
             ...(busy
               ? s.disabledBtn
               : {}),
@@ -1691,7 +1406,6 @@ function SubmissionEditor({
         <button
           style={{
             ...s.secondaryBtn,
-
             ...(busy
               ? s.disabledBtn
               : {}),
@@ -1700,8 +1414,7 @@ function SubmissionEditor({
           disabled={busy}
         >
           {busy &&
-          reviewAction ===
-            'review'
+          reviewAction === 'review'
             ? 'Reviewing…'
             : 'Save and Run Review'}
         </button>
@@ -1709,7 +1422,6 @@ function SubmissionEditor({
         <button
           style={{
             ...s.primaryBtn,
-
             ...(busy
               ? s.disabledBtn
               : {}),
@@ -1733,69 +1445,50 @@ const ITEM_TYPES = [
     value: 'mandate',
     label: 'Mandate',
   },
-
   {
-    value:
-      'responsibility',
-    label:
-      'Responsibility',
+    value: 'responsibility',
+    label: 'Responsibility',
   },
-
   {
-    value:
-      'accountability',
-    label:
-      'Accountability',
+    value: 'accountability',
+    label: 'Accountability',
   },
-
   {
     value: 'ownership',
     label: 'Owns',
   },
-
   {
     value: 'boundary',
-    label:
-      'Does Not Own',
+    label: 'Does Not Own',
   },
-
   {
     value: 'activity',
     label: 'Activity',
   },
-
   {
     value: 'task',
     label: 'Task',
   },
-
   {
     value: 'function',
     label: 'Function',
   },
-
   {
     value: 'output',
     label: 'Output',
   },
-
   {
     value: 'interface',
     label: 'Interface',
   },
-
   {
     value: 'kpi',
     label: 'KPI',
   },
-
   {
-    value:
-      'decision_authority',
-    label:
-      'Decision Right',
+    value: 'decision_authority',
+    label: 'Decision Right',
   },
-
   {
     value: 'other',
     label: 'Other',
@@ -1806,6 +1499,7 @@ function Field({
   label,
   value,
   onChange,
+  disabled,
 }) {
   return (
     <div>
@@ -1817,10 +1511,9 @@ function Field({
         style={s.field}
         value={value}
         onChange={(e) =>
-          onChange(
-            e.target.value
-          )
+          onChange(e.target.value)
         }
+        disabled={disabled}
       />
     </div>
   );
@@ -1837,9 +1530,7 @@ function ReferencesTab() {
     useState('');
 
   const [type, setType] =
-    useState(
-      'company_goals'
-    );
+    useState('company_goals');
 
   const [notes, setNotes] =
     useState('');
@@ -1871,9 +1562,7 @@ function ReferencesTab() {
     } catch (_) {}
   }
 
-  async function chooseReference(
-    e
-  ) {
+  async function chooseReference(e) {
     const chosen =
       e.target.files?.[0];
 
@@ -1985,46 +1674,22 @@ function ReferencesTab() {
   }
 
   return (
-    <div
-      style={s.referencesArea}
-    >
-      <div
-        style={
-          s.referencesIntro
-        }
-      >
-        <div
-          style={
-            s.sectionEyebrow
-          }
-        >
+    <div style={s.referencesArea}>
+      <div style={s.referencesIntro}>
+        <div style={s.sectionEyebrow}>
           COMPANY KNOWLEDGE
         </div>
 
-        <h2
-          style={s.referenceH2}
-        >
-          Goals, strategy,
-          business plans and
-          mandates
+        <h2 style={s.referenceH2}>
+          Goals, strategy, business plans and mandates
         </h2>
 
-        <p
-          style={
-            s.referenceLead
-          }
-        >
-          Save the company
-          references the OD agent
-          should use when deciding
-          whether responsibilities
-          make sense for BDC.
+        <p style={s.referenceLead}>
+          Save the company references the OD agent should use when deciding whether responsibilities make sense for BDC.
         </p>
       </div>
 
-      <div
-        style={s.referenceForm}
-      >
+      <div style={s.referenceForm}>
         <div style={s.twoCol}>
           <Field
             label="Reference title"
@@ -2033,9 +1698,7 @@ function ReferencesTab() {
           />
 
           <div>
-            <label
-              style={s.label}
-            >
+            <label style={s.label}>
               Reference type
             </label>
 
@@ -2048,39 +1711,27 @@ function ReferencesTab() {
                 )
               }
             >
-              <option
-                value="company_goals"
-              >
+              <option value="company_goals">
                 Company Goals
               </option>
 
-              <option
-                value="strategy"
-              >
+              <option value="strategy">
                 Strategic Priorities
               </option>
 
-              <option
-                value="business_plan"
-              >
+              <option value="business_plan">
                 Business Plan
               </option>
 
-              <option
-                value="functional_mandate"
-              >
+              <option value="functional_mandate">
                 Functional Mandate
               </option>
 
-              <option
-                value="operating_model"
-              >
+              <option value="operating_model">
                 Operating Model
               </option>
 
-              <option
-                value="company_reference"
-              >
+              <option value="company_reference">
                 Other Reference
               </option>
             </select>
@@ -2102,25 +1753,19 @@ function ReferencesTab() {
           placeholder="Optional context about this reference"
         />
 
-        <div
-          style={s.fileChipRow}
-        >
+        <div style={s.fileChipRow}>
           <input
             type="file"
             accept=".pptx,.txt,.md,.csv"
             ref={fileRef}
-            onChange={
-              chooseReference
-            }
+            onChange={chooseReference}
             style={{
               display: 'none',
             }}
           />
 
           <button
-            style={
-              s.secondaryBtn
-            }
+            style={s.secondaryBtn}
             onClick={() =>
               fileRef.current?.click()
             }
@@ -2129,9 +1774,7 @@ function ReferencesTab() {
           </button>
 
           {file && (
-            <div
-              style={s.fileChip}
-            >
+            <div style={s.fileChip}>
               📄 {file.name}
             </div>
           )}
@@ -2142,9 +1785,7 @@ function ReferencesTab() {
         </label>
 
         <textarea
-          style={
-            s.referenceContent
-          }
+          style={s.referenceContent}
           value={content}
           onChange={(e) =>
             setContent(
@@ -2169,18 +1810,13 @@ function ReferencesTab() {
       </div>
 
       <div style={s.savedRefs}>
-        <div
-          style={s.editorTitle}
-        >
+        <div style={s.editorTitle}>
           Saved references
         </div>
 
         {refs.length === 0 && (
-          <div
-            style={s.emptyText}
-          >
-            No company references
-            saved yet.
+          <div style={s.emptyText}>
+            No company references saved yet.
           </div>
         )}
 
@@ -2189,9 +1825,7 @@ function ReferencesTab() {
             key={r.id}
             style={s.refCard}
           >
-            <div
-              style={s.refType}
-            >
+            <div style={s.refType}>
               {String(
                 r.reference_type ||
                   ''
@@ -2201,16 +1835,12 @@ function ReferencesTab() {
               )}
             </div>
 
-            <div
-              style={s.refTitle}
-            >
+            <div style={s.refTitle}>
               {r.title}
             </div>
 
             {r.notes && (
-              <div
-                style={s.refNotes}
-              >
+              <div style={s.refNotes}>
                 {r.notes}
               </div>
             )}
@@ -2241,18 +1871,9 @@ function StructureTab() {
   }, []);
 
   return (
-    <div
-      style={s.structureArea}
-    >
-      <div
-        style={s.structureIntro}
-      >
-        Approved organization
-        structure used by the OD
-        agent. Confirmed reporting
-        changes made through the
-        review agent update this
-        live structure.
+    <div style={s.structureArea}>
+      <div style={s.structureIntro}>
+        Approved organization structure used by the OD agent.
       </div>
 
       {loading && (
@@ -2271,68 +1892,33 @@ function StructureTab() {
           CEO
         </div>
 
-        <div
-          style={s.stemDown}
-        />
+        <div style={s.stemDown} />
 
-        <div
-          style={
-            s.divisionsRow
-          }
-        >
+        <div style={s.divisionsRow}>
           {(tree || []).map(
             (division) => (
               <div
-                key={
-                  division.id
-                }
-                style={
-                  s.divisionCol
-                }
+                key={division.id}
+                style={s.divisionCol}
               >
-                <div
-                  style={
-                    s.stemSmall
-                  }
-                />
+                <div style={s.stemSmall} />
 
-                <div
-                  style={
-                    s.divisionBox
-                  }
-                >
-                  {
-                    division.name
-                  }
+                <div style={s.divisionBox}>
+                  {division.name}
                 </div>
 
-                {division.children
-                  .length > 0 && (
+                {division.children.length > 0 && (
                   <>
-                    <div
-                      style={
-                        s.stemSmall
-                      }
-                    />
+                    <div style={s.stemSmall} />
 
-                    <div
-                      style={
-                        s.deptStack
-                      }
-                    >
+                    <div style={s.deptStack}>
                       {division.children.map(
                         (d) => (
                           <div
-                            key={
-                              d.id
-                            }
-                            style={
-                              s.deptBox
-                            }
+                            key={d.id}
+                            style={s.deptBox}
                           >
-                            {
-                              d.name
-                            }
+                            {d.name}
                           </div>
                         )
                       )}
@@ -2354,20 +1940,17 @@ function HelpTab() {
       'Add the function',
       'Upload the completed PPTX or enter responsibilities manually. Add any context before extraction.',
     ],
-
     [
       'Check the extraction',
       'The agent shows every relevant submitted statement first. Edit, remove, or add items before saving.',
     ],
-
     [
       'Run the review',
-      'Run a focused review or a Full Review against all saved functions, the approved structure, company references, and OD rules.',
+      'Run a focused review or a Full Review against saved functions, the approved structure, company references, and relevant market peers.',
     ],
-
     [
       'Calibrate and update',
-      'Use the concise findings in the department meeting, then update the final responsibilities and save the agreed version.',
+      'Use the checklist findings during the department meeting, then update the final responsibilities.',
     ],
   ];
 
@@ -2378,15 +1961,7 @@ function HelpTab() {
       </h2>
 
       <p style={s.helpLead}>
-        This is a working tool for
-        building BDC's functional
-        responsibility model, not
-        only a document chatbot.
-        The review should help OD
-        confirm who owns what,
-        remove real duplication,
-        and identify important
-        missing ownership.
+        This tool helps OD confirm ownership, remove real duplication, identify gaps, and compare the function with relevant market practice.
       </p>
 
       {steps.map(
@@ -2395,28 +1970,16 @@ function HelpTab() {
             style={s.helpStep}
             key={step[0]}
           >
-            <div
-              style={
-                s.helpStepNum
-              }
-            >
+            <div style={s.helpStepNum}>
               0{i + 1}
             </div>
 
             <div>
-              <div
-                style={
-                  s.helpStepTitle
-                }
-              >
+              <div style={s.helpStepTitle}>
                 {step[0]}
               </div>
 
-              <div
-                style={
-                  s.helpStepBody
-                }
-              >
+              <div style={s.helpStepBody}>
                 {step[1]}
               </div>
             </div>
@@ -2515,8 +2078,7 @@ const s = {
   workspaceHeader: {
     display: 'flex',
     gap: 12,
-    justifyContent:
-      'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     flexWrap: 'wrap',
   },
@@ -2530,8 +2092,7 @@ const s = {
 
   sectionEyebrow: {
     fontSize: 10.5,
-    letterSpacing:
-      '0.12em',
+    letterSpacing: '0.12em',
     color: olive,
     fontWeight: 600,
     marginBottom: 3,
@@ -2546,8 +2107,7 @@ const s = {
   prepareCard: {
     marginTop: 12,
     padding: 12,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 10,
     background: parch,
   },
@@ -2561,37 +2121,30 @@ const s = {
   },
 
   fileChip: {
-    display:
-      'inline-flex',
+    display: 'inline-flex',
     maxWidth: '100%',
     padding: '7px 10px',
     borderRadius: 7,
     background: '#fff',
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     fontSize: 12.5,
     overflow: 'hidden',
-    textOverflow:
-      'ellipsis',
+    textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
 
   composerFileChip: {
-    alignSelf:
-      'flex-start',
-    margin:
-      '0 0 6px 44px',
+    alignSelf: 'flex-start',
+    margin: '0 0 6px 44px',
     padding: '5px 9px',
     borderRadius: 6,
     background: parch,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     fontSize: 11.5,
     maxWidth:
       'calc(100% - 60px)',
     overflow: 'hidden',
-    textOverflow:
-      'ellipsis',
+    textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
 
@@ -2613,8 +2166,7 @@ const s = {
   commentBox: {
     width: '100%',
     minHeight: 70,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 8,
     padding: 10,
     outline: 'none',
@@ -2634,16 +2186,14 @@ const s = {
   editorCard: {
     marginTop: 14,
     padding: 14,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 10,
     background: '#fff',
   },
 
   editorHeader: {
     display: 'flex',
-    justifyContent:
-      'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     gap: 10,
     marginBottom: 12,
@@ -2667,8 +2217,7 @@ const s = {
   field: {
     width: '100%',
     minHeight: 38,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 7,
     padding: '8px 10px',
     background: parch,
@@ -2680,8 +2229,7 @@ const s = {
   longField: {
     width: '100%',
     minHeight: 72,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 7,
     padding: '9px 10px',
     background: parch,
@@ -2693,18 +2241,15 @@ const s = {
 
   itemsHeader: {
     display: 'flex',
-    alignItems:
-      'flex-start',
-    justifyContent:
-      'space-between',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: 10,
     marginBottom: 8,
   },
 
   itemList: {
     display: 'flex',
-    flexDirection:
-      'column',
+    flexDirection: 'column',
     gap: 7,
   },
 
@@ -2718,8 +2263,7 @@ const s = {
 
   typeSelect: {
     minHeight: 42,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 7,
     padding: '7px',
     background: '#fff',
@@ -2730,8 +2274,7 @@ const s = {
   itemText: {
     width: '100%',
     minHeight: 42,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 7,
     padding: '8px 9px',
     background: parch,
@@ -2744,8 +2287,7 @@ const s = {
     width: 32,
     height: 32,
     borderRadius: 7,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     background: '#fff',
     color: brick,
     cursor: 'pointer',
@@ -2770,16 +2312,10 @@ const s = {
     cursor: 'pointer',
   },
 
-  disabledBtn: {
-    opacity: 0.55,
-    cursor: 'not-allowed',
-  },
-
   secondaryBtn: {
     background: '#fff',
     color: olive,
-    border:
-      `1px solid ${olive}`,
+    border: `1px solid ${olive}`,
     borderRadius: 7,
     padding: '8px 12px',
     fontSize: 12.5,
@@ -2787,10 +2323,14 @@ const s = {
     cursor: 'pointer',
   },
 
+  disabledBtn: {
+    opacity: 0.55,
+    cursor: 'not-allowed',
+  },
+
   textBtn: {
     border: 'none',
-    background:
-      'transparent',
+    background: 'transparent',
     color: brick,
     fontSize: 12,
     fontWeight: 600,
@@ -2799,8 +2339,7 @@ const s = {
   },
 
   smallSelect: {
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 7,
     padding: '7px 9px',
     background: parch,
@@ -2813,63 +2352,15 @@ const s = {
     background: '#fff',
     display: 'flex',
     gap: 8,
-    borderBottom:
-      `1px solid ${line}`,
+    borderBottom: `1px solid ${line}`,
     alignItems: 'center',
-  },
-
-  chatSearchRow: {
-    padding:
-      '8px clamp(14px, 4vw, 28px)',
-    background: '#fff',
-    borderBottom:
-      `1px solid ${line}`,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 7,
-  },
-
-  searchIcon: {
-    color: olive,
-    fontSize: 18,
-    lineHeight: 1,
-  },
-
-  chatSearchInput: {
-    flex: 1,
-    minWidth: 0,
-    border:
-      `1px solid ${line}`,
-    borderRadius: 7,
-    padding: '7px 9px',
-    background: parch,
-    color: ink,
-    outline: 'none',
-    fontSize: 12.5,
-  },
-
-  clearSearchBtn: {
-    border: 'none',
-    background:
-      'transparent',
-    color: brick,
-    fontSize: 11.5,
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-
-  searchCount: {
-    color: muted,
-    fontSize: 10.5,
-    whiteSpace: 'nowrap',
   },
 
   targetSelect: {
     minWidth: 0,
     flex: 1,
     maxWidth: 420,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 7,
     padding: '8px 10px',
     background: parch,
@@ -2889,6 +2380,49 @@ const s = {
     flexShrink: 0,
   },
 
+  chatSearchRow: {
+    padding:
+      '8px clamp(14px, 4vw, 28px)',
+    background: '#fff',
+    borderBottom: `1px solid ${line}`,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+  },
+
+  searchIcon: {
+    color: olive,
+    fontSize: 18,
+    lineHeight: 1,
+  },
+
+  chatSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    border: `1px solid ${line}`,
+    borderRadius: 7,
+    padding: '7px 9px',
+    background: parch,
+    color: ink,
+    outline: 'none',
+    fontSize: 12.5,
+  },
+
+  clearSearchBtn: {
+    border: 'none',
+    background: 'transparent',
+    color: brick,
+    fontSize: 11.5,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+
+  searchCount: {
+    color: muted,
+    fontSize: 10.5,
+    whiteSpace: 'nowrap',
+  },
+
   chatArea: {
     flex: 1,
     minHeight: 240,
@@ -2896,15 +2430,13 @@ const s = {
     padding:
       '16px clamp(14px, 4vw, 28px)',
     display: 'flex',
-    flexDirection:
-      'column',
+    flexDirection: 'column',
     gap: 13,
   },
 
   bubbleRow: {
     display: 'flex',
-    alignItems:
-      'flex-start',
+    alignItems: 'flex-start',
     gap: 9,
   },
 
@@ -2918,8 +2450,7 @@ const s = {
     fontWeight: 600,
     display: 'flex',
     alignItems: 'center',
-    justifyContent:
-      'center',
+    justifyContent: 'center',
     flexShrink: 0,
     marginTop: 2,
   },
@@ -2931,21 +2462,19 @@ const s = {
     borderRadius:
       '14px 14px 3px 14px',
     maxWidth: '82%',
-    whiteSpace:
-      'pre-wrap',
+    whiteSpace: 'pre-wrap',
     fontSize: 13.5,
     lineHeight: 1.5,
   },
 
   assistantBubble: {
     background: '#fff',
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     color: ink,
     padding: '10px 13px',
     borderRadius:
       '3px 14px 14px 14px',
-    maxWidth: '88%',
+    maxWidth: '92%',
     whiteSpace: 'normal',
     fontSize: 13.5,
     lineHeight: 1.52,
@@ -2955,16 +2484,14 @@ const s = {
   tableScroll: {
     width: '100%',
     overflowX: 'auto',
-    WebkitOverflowScrolling:
-      'touch',
+    WebkitOverflowScrolling: 'touch',
     margin: '10px 0 12px',
   },
 
   markdownTable: {
     width: '100%',
-    minWidth: 460,
-    borderCollapse:
-      'collapse',
+    minWidth: 720,
+    borderCollapse: 'collapse',
     tableLayout: 'auto',
     background: '#fff',
     fontSize: 12.5,
@@ -2972,8 +2499,7 @@ const s = {
   },
 
   markdownTh: {
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     padding: '9px 10px',
     textAlign: 'left',
     verticalAlign: 'top',
@@ -2984,14 +2510,19 @@ const s = {
   },
 
   markdownTd: {
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     padding: '9px 10px',
     textAlign: 'left',
     verticalAlign: 'top',
     background: '#fff',
     color: ink,
     whiteSpace: 'normal',
+  },
+
+  markdownLink: {
+    color: brick,
+    fontWeight: 600,
+    textDecoration: 'underline',
   },
 
   markdownP: {
@@ -3012,8 +2543,7 @@ const s = {
     fontFamily:
       "'Fraunces', serif",
     fontSize: 20,
-    margin:
-      '4px 0 10px',
+    margin: '4px 0 10px',
     color: ink,
   },
 
@@ -3021,33 +2551,28 @@ const s = {
     fontFamily:
       "'Fraunces', serif",
     fontSize: 18,
-    margin:
-      '10px 0 8px',
+    margin: '10px 0 8px',
     color: ink,
   },
 
   markdownH3: {
     fontSize: 14.5,
-    margin:
-      '10px 0 6px',
+    margin: '10px 0 6px',
     color: brick,
     fontWeight: 600,
   },
 
   markdownQuote: {
-    margin:
-      '8px 0 10px',
+    margin: '8px 0 10px',
     padding: '8px 10px',
-    borderLeft:
-      `3px solid ${olive}`,
+    borderLeft: `3px solid ${olive}`,
     background: parch,
     color: ink,
   },
 
   markdownHr: {
     border: 'none',
-    borderTop:
-      `1px solid ${line}`,
+    borderTop: `1px solid ${line}`,
     margin: '12px 0',
   },
 
@@ -3062,8 +2587,7 @@ const s = {
     position: 'sticky',
     bottom: 0,
     background: '#fff',
-    borderTop:
-      `1px solid ${line}`,
+    borderTop: `1px solid ${line}`,
     padding:
       '9px clamp(10px, 3vw, 20px) 12px',
     zIndex: 4,
@@ -3079,8 +2603,7 @@ const s = {
     width: 38,
     minWidth: 38,
     borderRadius: 9,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     background: parch,
     color: brick,
     fontSize: 22,
@@ -3093,8 +2616,7 @@ const s = {
     maxHeight: 110,
     padding: '11px 12px',
     borderRadius: 9,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     fontSize: 13.5,
     outline: 'none',
     background: parch,
@@ -3140,8 +2662,7 @@ const s = {
 
   referenceForm: {
     background: '#fff',
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 10,
     padding: 14,
   },
@@ -3149,8 +2670,7 @@ const s = {
   referenceContent: {
     width: '100%',
     minHeight: 190,
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 8,
     padding: 10,
     outline: 'none',
@@ -3166,8 +2686,7 @@ const s = {
 
   refCard: {
     background: '#fff',
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 9,
     padding: 11,
     marginTop: 8,
@@ -3175,10 +2694,8 @@ const s = {
 
   refType: {
     fontSize: 9.5,
-    letterSpacing:
-      '0.08em',
-    textTransform:
-      'uppercase',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
     color: olive,
     fontWeight: 600,
   },
@@ -3219,8 +2736,7 @@ const s = {
 
   orgChart: {
     display: 'flex',
-    flexDirection:
-      'column',
+    flexDirection: 'column',
     alignItems: 'center',
     minWidth: 'fit-content',
   },
@@ -3231,8 +2747,7 @@ const s = {
     fontFamily:
       "'Fraunces', serif",
     fontWeight: 600,
-    padding:
-      '10px 26px',
+    padding: '10px 26px',
     borderRadius: 6,
     fontSize: 15,
   },
@@ -3246,15 +2761,13 @@ const s = {
   divisionsRow: {
     display: 'flex',
     gap: 22,
-    borderTop:
-      `2px solid ${line}`,
+    borderTop: `2px solid ${line}`,
     width: 'fit-content',
   },
 
   divisionCol: {
     display: 'flex',
-    flexDirection:
-      'column',
+    flexDirection: 'column',
     alignItems: 'center',
   },
 
@@ -3263,8 +2776,7 @@ const s = {
     color: '#fff',
     fontSize: 13,
     fontWeight: 600,
-    padding:
-      '9px 14px',
+    padding: '9px 14px',
     borderRadius: 6,
     whiteSpace: 'nowrap',
   },
@@ -3277,18 +2789,15 @@ const s = {
 
   deptStack: {
     display: 'flex',
-    flexDirection:
-      'column',
+    flexDirection: 'column',
     gap: 6,
   },
 
   deptBox: {
     background: '#fff',
-    border:
-      `1px solid ${line}`,
+    border: `1px solid ${line}`,
     borderRadius: 5,
-    padding:
-      '6px 12px',
+    padding: '6px 12px',
     fontSize: 12,
     whiteSpace: 'nowrap',
     textAlign: 'center',
