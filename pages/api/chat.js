@@ -1,90 +1,296 @@
 import { supabase } from '../../lib/supabase';
 import { COMPANY_CONTEXT } from '../../lib/companyContext';
-import { getStructureTree, structureToText } from '../../lib/structure';
+import {
+  getStructureTree,
+  structureToText,
+} from '../../lib/structure';
 import {
   executeStructureTool,
   STRUCTURE_TOOL_DEFINITION,
 } from '../../lib/structureTools';
 
-function list(v) {
-  return Array.isArray(v) && v.length ? v.join('; ') : '—';
+function list(value) {
+  return Array.isArray(value) && value.length
+    ? value.join('; ')
+    : '—';
 }
 
-function formatSubmissions(subs) {
-  if (!subs.length) return '(No active submissions saved yet.)';
+function formatSubmissions(submissions) {
+  if (!submissions?.length) {
+    return '(No active submissions saved yet.)';
+  }
 
-  return subs
+  return submissions
     .map(
       (s) => `
 ### ${s.department_function} (${s.division})
-Status: ${s.status || 'active'}
-User comments: ${s.user_comments || '—'}
-Mandate: ${s.functional_statement || '—'}
-Core responsibilities: ${list(s.core_responsibilities)}
-Owns: ${list(s.owns)}
-Does not own: ${list(s.does_not_own)}
-Outputs: ${list(s.key_outputs)}
-Interfaces: ${list(s.interfaces)}
-KPIs: ${list(s.kpis)}
-Decision authorities: ${list(s.decision_authorities)}
-Success factors / challenges: ${list(s.success_factors_challenges)}
-Extracted statements: ${
-        Array.isArray(s.extracted_items)
-          ? s.extracted_items
-              .map((x) => `[${x.type || 'item'}] ${x.text}`)
-              .join('; ')
-          : '—'
-      }
-Source: ${s.source_filename || 'manual entry'}
+
+Mandate
+${s.functional_statement || '—'}
+
+Core responsibilities
+${list(s.core_responsibilities)}
+
+Owns
+${list(s.owns)}
+
+Does not own
+${list(s.does_not_own)}
+
+Outputs
+${list(s.key_outputs)}
+
+Interfaces
+${list(s.interfaces)}
+
+KPIs
+${list(s.kpis)}
+
+Decision authorities
+${list(s.decision_authorities)}
+
+Success factors and challenges
+${list(s.success_factors_challenges)}
+
+User comments
+${s.user_comments || '—'}
+
+Source
+${s.source_filename || 'Manual entry'}
 `.trim()
     )
     .join('\n\n');
 }
 
-function formatReferences(refs) {
-  if (!refs?.length) {
+function formatReferences(references) {
+  if (!references?.length) {
     return '(No company reference documents saved yet.)';
   }
 
-  return refs
+  return references
     .map(
       (r) => `
 ### ${r.title}
-Type: ${r.reference_type}
-Notes: ${r.notes || '—'}
-Content:
-${String(r.content || '').slice(0, 12000)}
+
+Type
+${r.reference_type || 'Reference'}
+
+Notes
+${r.notes || '—'}
+
+Content
+${String(r.content || '').slice(0, 14000)}
 `.trim()
     )
     .join('\n\n');
 }
 
-async function callClaude(systemPrompt, messages) {
+function getTools(mode) {
+  const tools = [
+    STRUCTURE_TOOL_DEFINITION,
+  ];
+
+  if (
+    mode === 'review' ||
+    mode === 'full_review'
+  ) {
+    tools.push({
+      type: 'web_search_20260318',
+      name: 'web_search',
+      max_uses:
+        mode === 'full_review'
+          ? 8
+          : 5,
+
+      allowed_callers: [
+        'direct',
+      ],
+
+      user_location: {
+        type: 'approximate',
+        city: 'Jeddah',
+        region: 'Makkah',
+        country: 'SA',
+        timezone:
+          'Asia/Riyadh',
+      },
+    });
+  }
+
+  return tools;
+}
+
+async function callClaude(
+  systemPrompt,
+  messages,
+  mode
+) {
   const response = await fetch(
     'https://api.anthropic.com/v1/messages',
     {
       method: 'POST',
+
       headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
+        'x-api-key':
+          process.env
+            .ANTHROPIC_API_KEY,
+
+        'anthropic-version':
+          '2023-06-01',
+
+        'content-type':
+          'application/json',
       },
+
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1800,
+        model:
+          'claude-sonnet-4-6',
+
+        max_tokens: 2600,
+
         system: systemPrompt,
-        tools: [STRUCTURE_TOOL_DEFINITION],
+
+        tools: getTools(mode),
+
         messages,
       }),
     }
   );
 
-  return response.json();
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ||
+        'Anthropic request failed'
+    );
+  }
+
+  return data;
 }
 
-export default async function handler(req, res) {
+/*
+  Claude web search returns citations as metadata
+  attached to text blocks.
+
+  This converts those citations into normal
+  Markdown links so react-markdown in index.js
+  can display clickable sources.
+*/
+function renderClaudeContent(content) {
+  if (!Array.isArray(content)) {
+    return '';
+  }
+
+  const parts = [];
+
+  for (const block of content) {
+    if (
+      block.type !== 'text' ||
+      !block.text
+    ) {
+      continue;
+    }
+
+    let text = block.text;
+
+    if (
+      Array.isArray(
+        block.citations
+      ) &&
+      block.citations.length
+    ) {
+      const unique = [];
+
+      for (const citation of block.citations) {
+        if (
+          citation.type !==
+            'web_search_result_location' ||
+          !citation.url
+        ) {
+          continue;
+        }
+
+        const exists =
+          unique.some(
+            (x) =>
+              x.url ===
+              citation.url
+          );
+
+        if (!exists) {
+          unique.push({
+            title:
+              citation.title ||
+              'Source',
+
+            url: citation.url,
+          });
+        }
+      }
+
+      if (unique.length) {
+        const sourceLinks =
+          unique
+            .map(
+              (source) =>
+                `[${escapeMarkdownLabel(
+                  source.title
+                )}](${source.url})`
+            )
+            .join(' · ');
+
+        /*
+          No forced newline here because the text
+          may be inside a Markdown table cell.
+        */
+        text += ` ${sourceLinks}`;
+      }
+    }
+
+    parts.push(text);
+  }
+
+  return parts.join('');
+}
+
+function escapeMarkdownLabel(value) {
+  return String(value || '')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]');
+}
+
+function hasWebSearchError(
+  content
+) {
+  if (!Array.isArray(content)) {
+    return false;
+  }
+
+  return content.some(
+    (block) =>
+      block.type ===
+        'web_search_tool_result' &&
+      block.content &&
+      !Array.isArray(
+        block.content
+      ) &&
+      block.content.type ===
+        'web_search_tool_result_error'
+  );
+}
+
+export default async function handler(
+  req,
+  res
+) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Use POST' });
+    return res
+      .status(405)
+      .json({
+        error: 'Use POST',
+      });
   }
 
   const {
@@ -95,30 +301,45 @@ export default async function handler(req, res) {
 
   if (
     !Array.isArray(messages) ||
-    messages.length === 0
+    !messages.length
   ) {
     return res
       .status(400)
-      .json({ error: 'messages array required' });
+      .json({
+        error:
+          'messages array required',
+      });
   }
 
   const latestUserMessage =
-    messages[messages.length - 1];
+    messages[
+      messages.length - 1
+    ];
+
+  const mode =
+    review_context?.mode ||
+    'chat';
 
   try {
-    await supabase.from('chat_messages').insert({
-      role: 'user',
-      content: latestUserMessage.content,
-      author: author || null,
-    });
+    await supabase
+      .from('chat_messages')
+      .insert({
+        role: 'user',
+        content:
+          latestUserMessage.content,
+        author:
+          author || null,
+      });
 
     const [
-      { data: submissions },
-      { data: rules },
-      { data: references },
+      submissionsResult,
+      rulesResult,
+      referencesResult,
     ] = await Promise.all([
       supabase
-        .from('function_submissions')
+        .from(
+          'function_submissions'
+        )
         .select('*')
         .order('division'),
 
@@ -128,7 +349,9 @@ export default async function handler(req, res) {
         .eq('active', true),
 
       supabase
-        .from('reference_documents')
+        .from(
+          'reference_documents'
+        )
         .select('*')
         .eq('active', true)
         .order('created_at', {
@@ -136,85 +359,107 @@ export default async function handler(req, res) {
         }),
     ]);
 
+    const submissions =
+      submissionsResult.data || [];
+
+    const rules =
+      rulesResult.data || [];
+
+    const references =
+      referencesResult.data ||
+      [];
+
     const structureTree =
       await getStructureTree();
 
     const structureText =
-      structureToText(structureTree);
+      structureToText(
+        structureTree
+      );
 
-    const rulesBlock = rules?.length
-      ? rules
-          .map((r) => `• ${r.rule_text}`)
-          .join('\n')
-      : '(No saved review rules.)';
+    const rulesBlock =
+      rules.length
+        ? rules
+            .map(
+              (r) =>
+                `• ${r.rule_text}`
+            )
+            .join('\n')
+        : '(No saved OD rules.)';
 
     const target =
-      review_context?.target_department_function
+      review_context
+        ?.target_department_function
         ? `${
-            review_context.target_department_function
+            review_context
+              .target_department_function
           }${
-            review_context.target_division
+            review_context
+              ?.target_division
               ? ` (${review_context.target_division})`
               : ''
           }`
-        : 'not specified';
+        : 'Not specified';
 
-    const mode =
-      review_context?.mode || 'chat';
-
-    const extraComment =
-      review_context?.user_comment || '';
+    const userContext =
+      review_context
+        ?.user_comment || '—';
 
     const systemPrompt = `
-You are the internal Organizational Development review specialist for Al Balad Development Company.
+You are the Organizational Development review specialist for Al Balad Development Company, BDC.
 
-Your purpose is to save the OD team time before calibration meetings by reviewing each functional submission against BDC's approved functional architecture standard and the evidence available in the system.
+Your job is to save the OD team time before meetings with departments.
+
+You review submitted functional architecture and identify only issues that matter.
+
+Do not behave like a general chatbot.
+
+Do not produce long consulting reports.
 
 ${COMPANY_CONTEXT}
 
-APPROVED ORGANIZATION STRUCTURE
+APPROVED BDC ORGANIZATION STRUCTURE
 
 ${structureText}
 
-COMPANY REFERENCE KNOWLEDGE
+SAVED BDC COMPANY REFERENCES
 
-Use these references when relevant to company goals, strategy, business plans, operating model needs, functional mandates, or external benchmarks.
-
-Never invent a benchmark source.
-
-${formatReferences(references || [])}
+${formatReferences(
+  references
+)}
 
 SAVED OD RULES
 
 ${rulesBlock}
 
-FUNCTION SUBMISSION HISTORY
+ACTIVE FUNCTION SUBMISSIONS
 
-Current active submissions are the source of truth.
+${formatSubmissions(
+  submissions
+)}
 
-Superseded records are historical context only and must not be treated as current ownership claims.
+CURRENT REQUEST
 
-${formatSubmissions(submissions || [])}
+Review mode
+${mode}
 
-CURRENT REVIEW REQUEST
+Selected function
+${target}
 
-Mode: ${mode}
+User comment or context
+${userContext}
 
-Selected function: ${target}
-
-User context/comment: ${extraComment || '—'}
 
 BDC OD REVIEW CHECKLIST
 
-Use the following checklist as the core review framework.
-
-These criteria come from BDC's functional review template and must be assessed as quality tests, not simple presence checks.
 
 1. MANDATE CLARITY
 
-Check whether a new executive could understand why the function exists.
+Ask
 
-A good mandate should explain
+Would a new executive understand why this function exists?
+
+Check whether the mandate explains
 
 Purpose
 
@@ -224,285 +469,401 @@ Scope
 
 Operating model role
 
-The mandate should not read like a list of tasks.
+Check whether it is written at function level.
 
-If the mandate exists but is vague, broad, repetitive, operational, or unclear, mark it Needs improvement.
+Do not accept a list of services or activities as a strong mandate.
+
+If the mandate is unclear, explain exactly what is missing.
+
 
 2. BOUNDARY CLARITY
 
-Check whether Owns and Does Not Own are specific enough to prevent overlap.
+Check whether Owns and Does Not Own clearly separate the function from other departments.
 
-Compare them with other active functions when evidence exists.
+Use actual BDC submissions and approved structure.
 
-Respect explicit boundaries already written in the submission.
+Do not infer an overlap from similar department names.
 
-Do not create an overlap simply because another department has a similar name.
+Do not assume what another department owns.
+
+A real overlap requires meaningful evidence that both functions claim materially the same accountability.
+
+If there is a possible issue but evidence is incomplete, use Clarify or Needs validation.
+
 
 3. RESPONSIBILITY QUALITY
 
-Check every major responsibility.
+Check the major responsibilities individually in your reasoning.
 
-Responsibilities should
+A good responsibility should
 
-Be written at department or function level
+Be at department or function level
 
-Describe accountable outcomes
+Describe an accountable outcome
 
-Be clear enough to understand ownership
+Be understandable
 
-Avoid routine job level tasks
+Support the mandate
 
-Avoid vague wording such as support, coordinate, follow up, assist, attend meetings, or prepare emails unless the actual accountability is clear
+Make ownership reasonably clear
 
-Check whether responsibilities logically support the mandate.
+Avoid routine job tasks
+
+Avoid empty wording such as
+
+Support
+
+Assist
+
+Follow up
+
+Attend meetings
+
+Coordinate
+
+unless the real accountability is also stated.
+
 
 4. OUTPUT DISCIPLINE
 
-Check whether outputs are tangible products of the function.
+Check whether outputs are tangible.
 
-Good outputs include
+Examples include
 
 Plans
+
+Policies
 
 Reports
 
 Standards
 
+Registers
+
 Models
 
 Dashboards
-
-Registers
-
-Policies
-
-Approvals
-
-Packs
 
 Frameworks
 
 Roadmaps
 
-Do not treat vague wording such as support, coordination, monitoring, or assistance as a strong output unless a tangible deliverable is identified.
+Approvals
+
+Packs
+
+Specifications
+
+Do not accept vague concepts such as support or coordination as strong outputs by themselves.
+
 
 5. KPI QUALITY
 
-Review the KPIs properly.
+This is a quality review, not a presence check.
 
-Do not only check whether KPIs exist.
+Review whether KPIs are
 
-Check whether each KPI is
-
-Clearly written
+Written properly
 
 Measurable
 
 Owned by the function
 
-Related to an actual responsibility
+Related to a responsibility
 
-Related to an output or expected result
+Related to an expected result or output
 
-Focused on outcome, quality, timeliness, efficiency, service level, risk, compliance, or governance
+Focused on outcome, quality, timeliness, service, cost, risk, compliance, efficiency or governance
 
-Not only measuring activity volume
+Not simply activity counts
 
-Not simply counting meetings, reports, follow ups, emails, or actions completed without measuring the result
+Weak examples include
 
-If a KPI is weak, explain exactly what is wrong.
+Number of meetings
 
-Give a short improved example that fits the actual responsibility.
+Number of reports
 
-Example
+Number of emails
 
-Weak KPI
+Number of follow ups
 
-Number of meetings held
+Number of actions
 
-Better KPI
+unless the number itself represents a meaningful business outcome.
 
-Percentage of required stakeholder approvals completed by the agreed milestone
+When a KPI is weak, explain what is wrong and recommend a better KPI relevant to the function.
 
-The improved example must be relevant to the submitted function.
 
 6. DECISION RIGHTS
 
-Check whether Recommend, Endorse or Sign off, Approve, and Escalate authorities are clear.
+Check
 
-Check whether
+Recommend
 
-The decision right is written clearly
+Endorse or sign off
 
-The decision belongs to this function
+Approve
 
-The function is not claiming approval authority that belongs elsewhere
+Escalate
 
-Escalation points are meaningful
+Assess whether the authority is clear and logically belongs to the function.
 
-Do not flag an authority as wrong unless available evidence supports that conclusion.
+Do not claim an approval is wrong without supporting evidence.
+
 
 7. INTERFACES
 
-Check whether major internal customers, handoffs, dependencies, and service relationships are identified.
+Check whether the important internal customers and handoffs are identified.
 
-The interface should explain why the functions interact, not only list department names.
+A strong interface explains
 
-Check whether important handoffs are missing or unclear.
+Who
+
+Why they interact
+
+What is provided
+
+What is received
+
+Where the handoff occurs
+
+Do not accept only a list of department names as a complete interface description.
+
 
 8. SCALABILITY
 
-Check whether the function distinguishes internal accountability from consultant, contractor, PMC, supplier, vendor, or outsourced execution.
+Check whether the submission separates internal ownership from external execution.
 
-External parties may execute work.
+This includes
 
-Internal functional accountability should remain clear.
+Consultants
 
-ADDITIONAL OD CHECKS
+Contractors
+
+PMCs
+
+Service providers
+
+Vendors
+
+Operators
+
+Suppliers
+
+The function may remain accountable even when external parties execute the work.
+
+
+ADDITIONAL OD TESTS
+
 
 9. OWNERSHIP LOGIC
 
-Check whether each major responsibility logically belongs in this function based on
+Ask whether the responsibility logically belongs in this function.
 
-Approved structure
+Use
 
-Function mandate
+Approved BDC structure
 
-Other active submissions
+Mandate
 
-BDC references
+Other BDC submissions
 
-Company strategy
+Company references
 
-Saved OD rules
+Market evidence
 
-Do not rely only on matching words.
+Nature of BDC's business
 
-Assess the meaning of the responsibility.
+Do not use keyword matching alone.
+
 
 10. OVERLAP RISK
 
-Flag only real or reasonably important duplication.
+Flag only meaningful duplication.
 
-A confirmed overlap requires meaningful evidence that two active functions explicitly claim materially the same accountability.
+Confirmed overlap means two functions explicitly claim materially the same accountability.
 
-If another function might be involved but the evidence is not enough, mark Clarify or Needs validation.
+If evidence is weaker, use Clarify.
 
-Do not use Overlap based only on
+Never say a department "likely owns" something and call that a confirmed overlap.
 
-Department names
-
-Job titles
-
-Industry assumptions
-
-What another department would normally do
 
 11. GAP RISK
 
-Flag only meaningful missing ownership.
+Flag only meaningful responsibilities required by BDC that appear to have no clear owner.
 
-A confirmed gap requires evidence that
+Before calling something a Gap
 
-The responsibility is actually needed by BDC
+Check other submissions
 
-The responsibility is not owned by the selected function
+Check approved structure
 
-No reasonable owner exists elsewhere in the available active submissions, structure, or reference material
+Check BDC references
 
-Do not create theoretical gaps using generic best practice.
+Check relevant market evidence
+
+Do not invent generic theoretical gaps.
+
 
 12. STRATEGY ALIGNMENT
 
-When company goals, strategic priorities, business plans, operating model references, or functional mandates are available, check whether the function covers the responsibilities required to support them.
+When BDC strategy, business plan, goals or operating model information is available, check whether the function supports those needs.
 
-Do not invent strategic priorities.
+Do not invent company strategy.
 
-BENCHMARK LOGIC
 
-Use benchmark evidence in this order.
+MARKET BENCHMARKING
 
-A. BDC STANDARD
+This is important.
 
-The BDC Functional Review Template is the primary benchmark for how mandates, responsibilities, outputs, KPIs, interfaces, decision rights, and boundaries should be written.
+For Review and Full Review, use live web search to benchmark the function against relevant market practice.
 
-B. BDC INTERNAL BENCHMARK
+Do not benchmark only against the BDC template.
 
-Compare against
+Your objective is to answer
 
-Approved organization structure
+How do credible comparable organizations structure or manage this type of responsibility?
 
-Other active functional submissions
+What does strong market practice look like?
 
-Saved company mandates
+Is BDC's submitted ownership materially different?
 
-Saved company references
+Would the market evidence suggest a clearer or stronger way to write the responsibility, mandate, KPI, interface, output or boundary?
 
-Saved OD rules
 
-C. EXTERNAL BENCHMARK
+PEER SELECTION
 
-Use only when an uploaded or saved reference explicitly contains external benchmark material.
+Choose peers based on the function being reviewed.
 
-When using an external benchmark, briefly identify the source.
+Prioritize organizations that are reasonably comparable to BDC such as
+
+Saudi real estate developers
+
+Master developers
+
+Destination developers
+
+Heritage and cultural destination developers
+
+Mixed use developers
+
+Large PIF portfolio companies where relevant
+
+Property and asset management organizations where relevant
+
+Tourism destination developers where relevant
+
+For some reviews, relevant peers may include organizations such as
+
+Diriyah Company
+
+Red Sea Global
+
+ROSHN Group
+
+New Murabba
+
+Qiddiya
+
+Rua Al Madinah
+
+Jeddah Central Development Company
+
+Other credible comparable developers
+
+Do not force these companies into every benchmark.
+
+Choose sources relevant to the responsibility being reviewed.
+
+
+MARKET SOURCES
+
+Prefer
+
+Official company websites
+
+Official annual reports
+
+Governance documents
+
+Published organizational material
+
+Official job or function descriptions when they provide useful evidence
+
+Government or regulator sources
+
+PIF portfolio information
+
+Recognized professional bodies
+
+Credible research organizations
+
+Major consulting firms where relevant
+
+Avoid weak blogs, SEO websites and unattributed content.
+
+
+BENCHMARK EVIDENCE RULES
+
+Never invent a market practice.
 
 Never claim
 
-"Best practice says"
+Best practice says
 
-"Benchmark organizations usually"
+Leading companies do
 
-"Leading companies normally"
+Market benchmark is
 
-unless actual benchmark evidence is available in the system.
+unless web evidence actually supports it.
 
-If no external benchmark exists, label the benchmark as BDC standard.
+If market evidence is weak or unavailable, say
 
-EVIDENCE STANDARD
+Market evidence limited
 
-1. Do not infer an overlap from a department name, job title, common industry practice, or what another function would normally own.
+Do not create a fake benchmark.
 
-2. If only one side is explicit, use Clarify rather than Overlap when the boundary is important.
+Benchmark actual practices and operating models, not just wording.
 
-3. Do not create theoretical gaps from generic best practice.
+Do not copy another company's structure blindly.
 
-4. User comments are context and may explain an intentional responsibility.
+Use market information as evidence to judge what makes sense for BDC.
 
-5. User comments do not automatically override approved structure or confirmed governance unless the comment states that it is a confirmed decision.
 
-6. Separate actual functional architecture issues from optional improvement ideas.
+WEB SEARCH BEHAVIOR
 
-7. If evidence is insufficient, say Needs validation briefly.
+For a normal Review
 
-8. Do not repeat the same issue under several checklist rows unless it genuinely affects different quality dimensions.
+Search only enough to establish useful market evidence.
 
-REVIEW OUTPUT FORMAT
+Normally use 2 to 4 focused searches.
 
-For mode "review" or "full_review", respond with ONE concise Markdown table.
+Do not research every checklist row separately.
 
-Nothing before the table except the title
+For a Full Review
 
-OD Review Checklist
+Perform broader market research when useful.
+
+Compare multiple credible peers.
+
+Look for functional ownership, responsibilities, operating model practices, boundaries and KPI approaches relevant to the selected function.
+
+Do not waste searches on facts that do not affect the OD conclusion.
+
+
+OUTPUT FORMAT
+
+For review or full_review, return only
+
+## OD Review Checklist
+
+Then one Markdown table.
 
 Use exactly these columns
 
-| Check | Status | Finding | Benchmark | Action |
+| Check | Status | Finding | Market Benchmark | Action |
 
-Statuses must be one of
-
-Good
-
-Needs improvement
-
-Clarify
-
-Overlap
-
-Gap
-
-Needs validation
-
-Always include these 8 BDC checklist rows
+Always show these rows
 
 Mandate clarity
 
@@ -520,7 +881,7 @@ Interfaces
 
 Scalability
 
-Add these rows only when they add meaningful value
+Add these only when they contain a meaningful issue or insight
 
 Ownership logic
 
@@ -530,146 +891,249 @@ Gap risk
 
 Strategy alignment
 
-Do not add rows only to make the review longer.
 
-Keep every cell short.
+ALLOWED STATUS
 
-Normally use one sentence maximum per cell.
+Good
 
-For Good rows use wording similar to
+Needs improvement
 
+Clarify
+
+Overlap
+
+Gap
+
+Needs validation
+
+
+KEEP IT SHORT
+
+This is critical.
+
+Each cell should normally contain one short sentence.
+
+Do not write paragraphs inside table cells.
+
+Good rows should be very short.
+
+Example
+
+Finding
 Good. No material issue.
 
-Benchmark
+Market Benchmark
+Consistent with observed peer practice.
 
-Meets BDC standard.
+Action
+No change.
+
+
+FOR A PROBLEM
+
+Finding
+
+State exactly what is wrong.
+
+Market Benchmark
+
+State briefly what credible peers or market sources do differently.
+
+Include the source link where market research supports the finding.
 
 Action
 
-No change.
+State exactly what should change.
 
-For issue rows state
 
-The exact problem
+SOURCE RULE
 
-The relevant benchmark
+For market benchmark claims, include the relevant clickable source in the Market Benchmark cell.
 
-The specific change required
+Do not add a long sources section after the table.
 
-The purpose is to allow the OD team to understand the issue immediately during a meeting.
+One or two strong sources are better than many weak sources.
 
-Do not write long explanations after the table unless the user explicitly asks for more detail.
 
-KPI REVIEW RULE
+FULL REVIEW
 
-If KPI quality has multiple problems, summarize the most important issue in the table.
+A Full Review must consider
 
-If the user asks specifically about KPIs, then review the KPIs individually and show each KPI with
+Selected submission
 
-Submitted KPI
-
-Issue
-
-Better KPI
-
-Reason
-
-FULL REVIEW SCOPE
-
-A Full Review must compare the selected function against everything available in the system including
-
-Active department submissions
-
-Saved responsibilities
+All active BDC submissions
 
 Approved organization structure
 
-Company references
+Saved company references
 
 Saved OD rules
 
-Relevant prior conversation context
+Relevant previous review information
 
-If no selected function is provided, review all active submissions together.
+Live market benchmark research
 
-STRUCTURE CHANGES
-
-If the user states a real confirmed change to the approved reporting structure, use update_org_structure.
-
-Do not use that tool for functional responsibility changes, review recommendations, or hypothetical questions.
 
 NORMAL CHAT
 
-For normal chat questions, answer directly and concisely.
+For ordinary questions, answer concisely.
 
-Use Markdown tables when they make the answer easier to scan.
+Do not automatically run a full checklist unless asked.
 `.trim();
 
-    let conversation = messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    let conversation =
+      messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
-    let data = await callClaude(
-      systemPrompt,
-      conversation
-    );
+    let data =
+      await callClaude(
+        systemPrompt,
+        conversation,
+        mode
+      );
 
+    /*
+      Handle both
+
+      1. Our custom org structure tool
+      2. Anthropic pause_turn from longer web searches
+    */
     let guard = 0;
 
     while (
-      data.stop_reason === 'tool_use' &&
-      guard < 3
+      guard < 6 &&
+      (data.stop_reason ===
+        'tool_use' ||
+        data.stop_reason ===
+          'pause_turn')
     ) {
       guard += 1;
 
-      const toolUseBlock =
-        data.content?.find(
-          (b) => b.type === 'tool_use'
-        );
+      if (
+        data.stop_reason ===
+        'pause_turn'
+      ) {
+        /*
+          Anthropic requires the paused
+          assistant content to be passed back
+          unchanged.
+        */
+        conversation = [
+          ...conversation,
+          {
+            role: 'assistant',
+            content:
+              data.content,
+          },
+        ];
 
-      if (!toolUseBlock) break;
+        data =
+          await callClaude(
+            systemPrompt,
+            conversation,
+            mode
+          );
 
-      const result =
-        await executeStructureTool(
-          toolUseBlock.input
-        );
+        continue;
+      }
+
+      const customToolBlocks =
+        data.content?.filter(
+          (block) =>
+            block.type ===
+              'tool_use' &&
+            block.name !==
+              'web_search'
+        ) || [];
+
+      if (
+        !customToolBlocks.length
+      ) {
+        break;
+      }
+
+      const toolResults = [];
+
+      for (const toolBlock of customToolBlocks) {
+        try {
+          const result =
+            await executeStructureTool(
+              toolBlock.input
+            );
+
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id:
+              toolBlock.id,
+            content:
+              JSON.stringify(
+                result
+              ),
+          });
+        } catch (error) {
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id:
+              toolBlock.id,
+            is_error: true,
+            content:
+              error.message,
+          });
+        }
+      }
 
       conversation = [
         ...conversation,
+
         {
           role: 'assistant',
-          content: data.content,
+          content:
+            data.content,
         },
+
         {
           role: 'user',
-          content: [
-            {
-              type: 'tool_result',
-              tool_use_id:
-                toolUseBlock.id,
-              content:
-                JSON.stringify(result),
-            },
-          ],
+          content:
+            toolResults,
         },
       ];
 
-      data = await callClaude(
-        systemPrompt,
-        conversation
-      );
+      data =
+        await callClaude(
+          systemPrompt,
+          conversation,
+          mode
+        );
     }
 
-    const textBlock =
-      data.content?.find(
-        (b) => b.type === 'text'
+    let replyText =
+      renderClaudeContent(
+        data.content
       );
 
-    const replyText =
-      textBlock?.text ||
-      data.error?.message ||
-      '(No reply returned.)';
+    if (!replyText.trim()) {
+      replyText =
+        data.error?.message ||
+        'No response returned.';
+    }
+
+    /*
+      If web search failed, do not let the
+      answer pretend it completed a live benchmark.
+    */
+    if (
+      hasWebSearchError(
+        data.content
+      ) &&
+      (mode === 'review' ||
+        mode ===
+          'full_review')
+    ) {
+      replyText +=
+        '\n\nMarket benchmark search was unavailable for this run.';
+    }
 
     await supabase
       .from('chat_messages')
@@ -678,12 +1142,29 @@ Use Markdown tables when they make the answer easier to scan.
         content: replyText,
       });
 
-    return res.status(200).json({
-      reply: replyText,
-    });
-  } catch (err) {
-    return res.status(500).json({
-      error: err.message,
-    });
+    return res
+      .status(200)
+      .json({
+        reply: replyText,
+
+        web_searches:
+          data.usage
+            ?.server_tool_use
+            ?.web_search_requests ||
+          0,
+      });
+  } catch (error) {
+    console.error(
+      'CHAT API ERROR',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        error:
+          error.message ||
+          'Review failed',
+      });
   }
 }
