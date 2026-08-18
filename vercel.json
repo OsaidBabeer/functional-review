@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "pages/api/chat.js": {
+      "maxDuration": 60
+    },
+    "pages/api/extract.js": {
+      "maxDuration": 60
+    },
+    "pages/api/structure-from-pdf.js": {
+      "maxDuration": 60
+    }
+  }
+}
