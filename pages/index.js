@@ -100,16 +100,43 @@ function ReviewTab() {
     setMessages(newMessages);
     setInput('');
     setSending(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000); // fail loudly, don't hang forever
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages }),
+        signal: controller.signal,
       });
-      const data = await res.json();
-      setMessages([...newMessages, { role: 'assistant', content: data.reply || data.error }]);
+      clearTimeout(timeoutId);
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        // Server returned something that wasn't JSON at all (a raw timeout
+        // page, for example) — surface that clearly instead of crashing silently.
+        setMessages([
+          ...newMessages,
+          {
+            role: 'assistant',
+            content: `Error: the server returned an unexpected response (status ${res.status}). This usually means the request took too long — try a shorter message, or break a large paste into smaller pieces.`,
+          },
+        ]);
+        setSending(false);
+        return;
+      }
+
+      setMessages([...newMessages, { role: 'assistant', content: data.reply || data.error || 'Something went wrong with no error message.' }]);
     } catch (err) {
-      setMessages([...newMessages, { role: 'assistant', content: 'Error: ' + err.message }]);
+      clearTimeout(timeoutId);
+      const msg = err.name === 'AbortError'
+        ? "Error: this took too long and timed out. Try a shorter message — large pastes combined with everything else being reviewed can exceed the time limit."
+        : 'Error: ' + err.message;
+      setMessages([...newMessages, { role: 'assistant', content: msg }]);
     }
     setSending(false);
   }
@@ -218,12 +245,18 @@ function ReviewTab() {
       </div>
 
       <div style={s.inputRow}>
-        <input
+        <textarea
           style={s.input}
           value={input}
           placeholder="Ask about overlaps, gaps, or tell me about a structure change…"
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          rows={1}
         />
         <button style={s.sendBtn} onClick={handleSend} disabled={sending}>Send</button>
       </div>
@@ -425,7 +458,7 @@ const s = {
   quickBtn: { background: 'transparent', color: olive, border: `1px solid ${olive}`, borderRadius: 6, padding: '7px 14px', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
 
   inputRow: { display: 'flex', gap: 10, padding: 'clamp(12px, 4vw, 18px) clamp(14px, 4vw, 28px)', borderTop: `1px solid ${line}`, background: '#fff' },
-  input: { flex: 1, padding: '13px 16px', borderRadius: 7, border: `1px solid ${line}`, fontSize: 14.5, outline: 'none', fontFamily: "'Inter', sans-serif", background: parch },
+  input: { flex: 1, padding: '13px 16px', borderRadius: 7, border: `1px solid ${line}`, fontSize: 14.5, outline: 'none', fontFamily: "'Inter', sans-serif", background: parch, resize: 'none', maxHeight: 140, lineHeight: 1.5 },
   sendBtn: { background: ink, color: '#fff', border: 'none', borderRadius: 7, padding: '0 26px', fontSize: 14.5, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
 
   structureArea: { flex: 1, overflowY: 'auto', overflowX: 'auto', padding: 'clamp(16px, 5vw, 28px)' },
