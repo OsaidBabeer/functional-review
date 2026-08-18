@@ -12,6 +12,13 @@ import { getStructureTree, structureToText } from '../../lib/structure';
 import { executeStructureTool, STRUCTURE_TOOL_DEFINITION } from '../../lib/structureTools';
 import { executeRuleTool, RULE_TOOL_DEFINITION } from '../../lib/ruleTools';
 
+function truncateList(arr, max = 8) {
+  if (!arr || arr.length === 0) return '—';
+  const shown = arr.slice(0, max).join('; ');
+  const remaining = arr.length - max;
+  return remaining > 0 ? `${shown} (+${remaining} more — ask about this function directly for the full list)` : shown;
+}
+
 function formatSubmissions(subs) {
   if (!subs.length) return '(No function submissions uploaded yet.)';
   return subs
@@ -19,12 +26,12 @@ function formatSubmissions(subs) {
       (s) => `
 ### ${s.department_function} (${s.division})
 Mandate: ${s.functional_statement || '—'}
-Core responsibilities: ${(s.core_responsibilities || []).join('; ') || '—'}
-Owns: ${(s.owns || []).join('; ') || '—'}
-Does not own: ${(s.does_not_own || []).join('; ') || '—'}
-Key outputs: ${(s.key_outputs || []).join('; ') || '—'}
-Interfaces: ${(s.interfaces || []).join('; ') || '—'}
-KPIs: ${(s.kpis || []).join('; ') || '—'}
+Core responsibilities: ${truncateList(s.core_responsibilities)}
+Owns: ${truncateList(s.owns)}
+Does not own: ${truncateList(s.does_not_own)}
+Key outputs: ${truncateList(s.key_outputs, 6)}
+Interfaces: ${truncateList(s.interfaces, 6)}
+KPIs: ${truncateList(s.kpis, 6)}
 `.trim()
     )
     .join('\n\n');
@@ -101,6 +108,14 @@ ${COMPANY_CONTEXT}
 
 CURRENT APPROVED STRUCTURE (reflects any changes already made — treat as up to date):
 ${structureText}
+
+NOTE ON THE DATA BELOW: to keep this message a reasonable size with many
+functions loaded, long lists (Owns, Responsibilities, KPIs, etc.) are
+truncated to the first several items per function, with a note showing how
+many more exist. Use what's shown to find likely overlaps and gaps, but if
+you need the complete list for one specific function to confirm or rule out
+an issue, say so and ask the user to request that one function by name
+rather than guessing from a partial list.
 
 YOUR JOB
 Read every function submission below against the company context and the
