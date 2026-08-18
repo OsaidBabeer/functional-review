@@ -127,16 +127,18 @@ function ReviewTab() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sending]);
 
-  async function sendMessage(text) {
-    if (!text.trim() || sending) return;
-    const newMessages = [...messages, { role: 'user', content: text }];
+  async function sendMessage(text, baseMessages) {
+    if (!text.trim() || sending) return messages;
+    const source = baseMessages || messages;
+    const newMessages = [...source, { role: 'user', content: text }];
     setMessages(newMessages);
     setInput('');
     setSending(true);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55000); // fail loudly, don't hang forever
+    const timeoutId = setTimeout(() => controller.abort(), 290000);
 
+    let finalMessages = newMessages;
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -150,37 +152,43 @@ function ReviewTab() {
       try {
         data = await res.json();
       } catch {
-        // Server returned something that wasn't JSON at all (a raw timeout
-        // page, for example) — surface that clearly instead of crashing silently.
-        setMessages([
+        finalMessages = [
           ...newMessages,
           {
             role: 'assistant',
             content: `Error: the server returned an unexpected response (status ${res.status}). This usually means the request took too long — try a shorter message, or break a large paste into smaller pieces.`,
           },
-        ]);
+        ];
+        setMessages(finalMessages);
         setSending(false);
-        return;
+        return finalMessages;
       }
 
-      setMessages([...newMessages, { role: 'assistant', content: data.reply || data.error || 'Something went wrong with no error message.' }]);
+      finalMessages = [...newMessages, { role: 'assistant', content: data.reply || data.error || 'Something went wrong with no error message.' }];
+      setMessages(finalMessages);
     } catch (err) {
       clearTimeout(timeoutId);
       const msg = err.name === 'AbortError'
         ? "Error: this took too long and timed out. Try a shorter message — large pastes combined with everything else being reviewed can exceed the time limit."
         : 'Error: ' + err.message;
-      setMessages([...newMessages, { role: 'assistant', content: msg }]);
+      finalMessages = [...newMessages, { role: 'assistant', content: msg }];
+      setMessages(finalMessages);
     }
     setSending(false);
+    return finalMessages;
   }
 
   function handleSend() {
     sendMessage(input);
   }
 
-  function runFullReview() {
-    sendMessage(
-      'Give me a full review of every function currently loaded: overlaps, gaps, ownership ambiguities, and structure issues.'
+  async function runFullReview() {
+    const afterPart1 = await sendMessage(
+      'Part 1 of the full review — cover ONLY overlaps and gaps across every function currently loaded. Be thorough on these two categories specifically; ambiguities and structure issues will be covered in a follow-up.'
+    );
+    await sendMessage(
+      'Part 2 of the full review — now cover ONLY ownership ambiguities and structure issues across every function currently loaded, following on from the overlaps and gaps you just covered.',
+      afterPart1
     );
   }
 
