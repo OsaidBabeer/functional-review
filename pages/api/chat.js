@@ -117,6 +117,18 @@ TOOLS
   to stop applying one, call manage_review_rule — actually call it.
 - Do not call either tool for hypothetical questions or general discussion.
 
+IMPORTANT — CONVERSATION HANDLING
+- There is NO way for the user to attach a file inline in this chat — file
+  uploads only happen through dedicated upload buttons elsewhere in the
+  app, never as part of a message you receive. If a past message in this
+  conversation mentions "the attachment" and no actual document content
+  appears with it, that request was never fulfillable through chat — do
+  not ask the user to re-upload it here, and do not let it block anything.
+- ALWAYS prioritize the user's most recent message. If earlier in the
+  conversation there's an unresolved or abandoned request, briefly
+  acknowledge it once if relevant, then move on — never make a new request
+  wait on an old, unresolved one.
+
 RULES TAUGHT BY OSAID AND EZWAH (ground truth):
 ${rulesBlock}
 
