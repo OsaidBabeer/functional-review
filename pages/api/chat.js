@@ -5,7 +5,7 @@
 // vercel.json's "functions" key which can be ignored depending on how the
 // build maps routes internally.
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
 };
 
 //
@@ -21,7 +21,7 @@ import { getStructureTree, structureToText } from '../../lib/structure';
 import { executeStructureTool, STRUCTURE_TOOL_DEFINITION } from '../../lib/structureTools';
 import { executeRuleTool, RULE_TOOL_DEFINITION } from '../../lib/ruleTools';
 
-function truncateList(arr, max = 8) {
+function truncateList(arr, max = 5) {
   if (!arr || arr.length === 0) return '—';
   const shown = arr.slice(0, max).join('; ');
   const remaining = arr.length - max;
@@ -38,9 +38,9 @@ Mandate: ${s.functional_statement || '—'}
 Core responsibilities: ${truncateList(s.core_responsibilities)}
 Owns: ${truncateList(s.owns)}
 Does not own: ${truncateList(s.does_not_own)}
-Key outputs: ${truncateList(s.key_outputs, 6)}
-Interfaces: ${truncateList(s.interfaces, 6)}
-KPIs: ${truncateList(s.kpis, 6)}
+Key outputs: ${truncateList(s.key_outputs, 4)}
+Interfaces: ${truncateList(s.interfaces, 4)}
+KPIs: ${truncateList(s.kpis, 4)}
 `.trim()
     )
     .join('\n\n');
@@ -56,7 +56,7 @@ async function callClaude(systemPrompt, messages) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 3000,
+      max_tokens: 2000,
       system: systemPrompt,
       tools: [STRUCTURE_TOOL_DEFINITION, RULE_TOOL_DEFINITION],
       messages,
