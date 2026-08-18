@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
 import JSZip from 'jszip';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const APP_NAME = 'BDC Functional Review';
 const APP_SUBTITLE = 'Organizational Design Review Agent';
@@ -68,6 +70,35 @@ function TabButton({ active, onClick, children }) {
     >
       {children}
     </button>
+  );
+}
+
+// Renders assistant/user messages as real markdown — tables, bold, links,
+// lists — instead of showing raw "| pipe | characters |" as plain text.
+// Wrapped in a horizontally-scrollable div per table, since a wide table
+// (this app deals in a lot of them) would otherwise force the whole chat
+// bubble wider than the screen.
+function MarkdownMessage({ content }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        table: ({ node, ...props }) => (
+          <div style={{ overflowX: 'auto', margin: '8px 0' }}>
+            <table style={s.mdTable} {...props} />
+          </div>
+        ),
+        th: ({ node, ...props }) => <th style={s.mdTh} {...props} />,
+        td: ({ node, ...props }) => <td style={s.mdTd} {...props} />,
+        a: ({ node, ...props }) => <a style={s.mdLink} target="_blank" rel="noopener noreferrer" {...props} />,
+        p: ({ node, ...props }) => <p style={{ margin: '0 0 8px 0' }} {...props} />,
+        ul: ({ node, ...props }) => <ul style={{ margin: '4px 0', paddingLeft: 20 }} {...props} />,
+        ol: ({ node, ...props }) => <ol style={{ margin: '4px 0', paddingLeft: 20 }} {...props} />,
+        code: ({ node, ...props }) => <code style={s.mdCode} {...props} />,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
   );
 }
 
@@ -229,7 +260,9 @@ function ReviewTab() {
         {messages.map((m, i) => (
           <div key={i} style={{ ...s.bubbleRow, justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
             {m.role === 'assistant' && <div style={s.avatar}>OD</div>}
-            <div style={m.role === 'user' ? s.userBubble : s.assistantBubble}>{m.content}</div>
+            <div style={m.role === 'user' ? s.userBubble : s.assistantBubble}>
+              <MarkdownMessage content={m.content} />
+            </div>
           </div>
         ))}
         {sending && (
@@ -450,8 +483,8 @@ const s = {
   chatArea: { flex: 1, overflowY: 'auto', padding: 'clamp(14px, 4vw, 20px) clamp(14px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: 16 },
   bubbleRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
   avatar: { width: 28, height: 28, borderRadius: '50%', background: olive, color: '#fff', fontSize: 10.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  userBubble: { background: brick, color: '#fff', padding: '11px 16px', borderRadius: '14px 14px 3px 14px', maxWidth: '72%', whiteSpace: 'pre-wrap', fontSize: 14.5, lineHeight: 1.55 },
-  assistantBubble: { background: '#fff', border: `1px solid ${line}`, color: ink, padding: '11px 16px', borderRadius: '3px 14px 14px 14px', maxWidth: '78%', whiteSpace: 'pre-wrap', fontSize: 14.5, lineHeight: 1.6 },
+  userBubble: { background: brick, color: '#fff', padding: '11px 16px', borderRadius: '14px 14px 3px 14px', maxWidth: '72%', fontSize: 14.5, lineHeight: 1.55 },
+  assistantBubble: { background: '#fff', border: `1px solid ${line}`, color: ink, padding: '11px 16px', borderRadius: '3px 14px 14px 14px', maxWidth: '94%', fontSize: 14.5, lineHeight: 1.6 },
   thinking: { color: olive, fontStyle: 'italic', fontFamily: "'Fraunces', serif" },
 
   quickRow: { padding: '10px clamp(14px, 4vw, 28px) 0', background: '#fff' },
@@ -484,4 +517,10 @@ const s = {
   helpStepTitle: { fontSize: 15, fontWeight: 600, marginBottom: 5, color: brick },
   helpStepBody: { fontSize: 13.5, lineHeight: 1.65, color: ink },
   helpNote: { marginTop: 26, fontSize: 13, color: olive, lineHeight: 1.6, borderTop: `1px solid ${line}`, paddingTop: 16 },
+
+  mdTable: { borderCollapse: 'collapse', fontSize: 13, minWidth: '100%' },
+  mdTh: { background: parch, border: `1px solid ${line}`, padding: '7px 10px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' },
+  mdTd: { border: `1px solid ${line}`, padding: '7px 10px', verticalAlign: 'top' },
+  mdLink: { color: brick, textDecoration: 'underline' },
+  mdCode: { background: parch, border: `1px solid ${line}`, borderRadius: 4, padding: '1px 5px', fontSize: 13, fontFamily: 'monospace' },
 };
