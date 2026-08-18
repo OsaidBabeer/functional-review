@@ -45,12 +45,14 @@ export default function Home() {
           <nav style={s.tabRow}>
             <TabButton active={tab === 'help'} onClick={() => setTab('help')}>How It Works</TabButton>
             <TabButton active={tab === 'review'} onClick={() => setTab('review')}>Function Review</TabButton>
+            <TabButton active={tab === 'functions'} onClick={() => setTab('functions')}>Functions</TabButton>
             <TabButton active={tab === 'structure'} onClick={() => setTab('structure')}>Structure</TabButton>
           </nav>
         </header>
 
         {tab === 'help' && <HelpTab />}
         {tab === 'review' && <ReviewTab />}
+        {tab === 'functions' && <FunctionsTab />}
         {tab === 'structure' && <StructureTab />}
       </div>
     </>
@@ -182,6 +184,12 @@ function ReviewTab() {
     );
   }
 
+  async function clearConversation() {
+    if (!confirm('Clear the whole conversation? This removes chat history for everyone using this app — uploaded functions and structure are not affected.')) return;
+    await fetch('/api/chat-history', { method: 'DELETE' });
+    setMessages([WELCOME]);
+  }
+
   // Reads a .pptx in the browser (it's just a zip file) and pulls the text
   // out of every slide, in order — same technique the old server route
   // used, just running here instead so the file itself never has to be
@@ -275,6 +283,7 @@ function ReviewTab() {
 
       <div style={s.quickRow}>
         <button style={s.quickBtn} onClick={runFullReview} disabled={sending}>Run Full Review</button>
+        <button style={s.quickBtnMuted} onClick={clearConversation} disabled={sending}>Clear Conversation</button>
       </div>
 
       <div style={s.inputRow}>
@@ -294,6 +303,40 @@ function ReviewTab() {
         <button style={s.sendBtn} onClick={handleSend} disabled={sending}>Send</button>
       </div>
     </>
+  );
+}
+
+// ============================= FUNCTIONS TAB =============================
+function FunctionsTab() {
+  const [subs, setSubs] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/submissions')
+      .then((r) => r.json())
+      .then((data) => setSubs(data.submissions || []));
+  }, []);
+
+  return (
+    <div style={s.functionsArea}>
+      <div style={s.structureIntro}>
+        Every function currently loaded. Open one to view it cleanly or download it as a PDF.
+      </div>
+      {subs === null && <div style={{ color: olive, padding: 20 }}>Loading…</div>}
+      {subs && subs.length === 0 && (
+        <div style={{ color: olive, padding: 20 }}>Nothing uploaded yet — go to Function Review and upload a submission.</div>
+      )}
+      <div style={s.functionsList}>
+        {(subs || []).map((sub) => (
+          <a key={sub.id} href={`/function/${sub.id}`} target="_blank" rel="noopener noreferrer" style={s.functionRow}>
+            <div>
+              <div style={s.functionName}>{sub.department_function}</div>
+              <div style={s.functionDivision}>{sub.division}</div>
+            </div>
+            <div style={s.functionArrow}>Open ↗</div>
+          </a>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -487,8 +530,9 @@ const s = {
   assistantBubble: { background: '#fff', border: `1px solid ${line}`, color: ink, padding: '11px 16px', borderRadius: '3px 14px 14px 14px', maxWidth: '94%', fontSize: 14.5, lineHeight: 1.6 },
   thinking: { color: olive, fontStyle: 'italic', fontFamily: "'Fraunces', serif" },
 
-  quickRow: { padding: '10px clamp(14px, 4vw, 28px) 0', background: '#fff' },
+  quickRow: { padding: '10px clamp(14px, 4vw, 28px) 0', background: '#fff', display: 'flex', gap: 8 },
   quickBtn: { background: 'transparent', color: olive, border: `1px solid ${olive}`, borderRadius: 6, padding: '7px 14px', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
+  quickBtnMuted: { background: 'transparent', color: '#999', border: '1px solid #ddd', borderRadius: 6, padding: '7px 14px', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
 
   inputRow: { display: 'flex', gap: 10, padding: 'clamp(12px, 4vw, 18px) clamp(14px, 4vw, 28px)', borderTop: `1px solid ${line}`, background: '#fff' },
   input: { flex: 1, padding: '13px 16px', borderRadius: 7, border: `1px solid ${line}`, fontSize: 14.5, outline: 'none', fontFamily: "'Inter', sans-serif", background: parch, resize: 'none', maxHeight: 140, lineHeight: 1.5 },
@@ -523,4 +567,11 @@ const s = {
   mdTd: { border: `1px solid ${line}`, padding: '7px 10px', verticalAlign: 'top' },
   mdLink: { color: brick, textDecoration: 'underline' },
   mdCode: { background: parch, border: `1px solid ${line}`, borderRadius: 4, padding: '1px 5px', fontSize: 13, fontFamily: 'monospace' },
+
+  functionsArea: { flex: 1, overflowY: 'auto', padding: 'clamp(16px, 5vw, 28px)' },
+  functionsList: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 560 },
+  functionRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', border: `1px solid ${line}`, borderRadius: 7, padding: '12px 16px', textDecoration: 'none', color: ink },
+  functionName: { fontSize: 14.5, fontWeight: 600 },
+  functionDivision: { fontSize: 12.5, color: olive, marginTop: 2 },
+  functionArrow: { fontSize: 12.5, color: brick, fontWeight: 500 },
 };
