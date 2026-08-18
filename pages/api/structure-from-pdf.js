@@ -1,6 +1,6 @@
 // pages/api/structure-from-pdf.js
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
 };
 
 import { extractStructureFromPdf } from '../../lib/structureFromDocument';
