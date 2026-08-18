@@ -1,6 +1,6 @@
 // pages/api/extract.js
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
 };
 
 // Now takes the FULL document text (all slides joined) and can return
