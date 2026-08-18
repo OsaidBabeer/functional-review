@@ -1,4 +1,8 @@
 // pages/api/structure-from-pdf.js
+export const config = {
+  maxDuration: 60,
+};
+
 import { extractStructureFromPdf } from '../../lib/structureFromDocument';
 import { rebuildStructure } from '../../lib/rebuildStructure';
 import { getStructureTree, structureToText } from '../../lib/structure';
