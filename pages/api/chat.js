@@ -1,5 +1,14 @@
 // pages/api/chat.js
 //
+// maxDuration set via Next.js's own config export below — this is the
+// reliable way Vercel picks this up for Next.js API routes, unlike
+// vercel.json's "functions" key which can be ignored depending on how the
+// build maps routes internally.
+export const config = {
+  maxDuration: 60,
+};
+
+//
 // Two tools now: update_org_structure (from before) and manage_review_rule
 // (new — this is what makes "remember this rule" actually persist). Both
 // go through the same generic tool-use loop: Claude calls a tool by name,
