@@ -15,7 +15,8 @@
     "formidable": "3.5.1",
     "adm-zip": "0.5.14",
     "jszip": "3.10.1",
-    "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0"
+    "react-markdown": "9.0.1",
+    "remark-gfm": "4.0.0",
+    "pptxgenjs": "3.12.0"
   }
 }
