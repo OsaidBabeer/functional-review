@@ -242,18 +242,20 @@ function ReviewTab() {
   async function downloadSlides() {
     setGeneratingSlides(true);
     try {
-      const parts = [];
-      for (const partNum of [1, 2, 3]) {
-        setUploadStatus(`Writing slides (part ${partNum} of 3)...`);
-        const res = await fetch('/api/generate-slides-content', {
+      setUploadStatus('Writing the deck (5 parts running in parallel)...');
+
+      const fetchPart = (partNum) =>
+        fetch('/api/generate-slides-content', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ part: partNum }),
+        }).then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || `Part ${partNum} failed`);
+          return data;
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Part ${partNum} failed`);
-        parts.push(data);
-      }
+
+      const parts = await Promise.all([1, 2, 3, 4, 5].map(fetchPart));
 
       setUploadStatus('Building the file...');
       const { buildPptx } = await import('../lib/slideTools');
