@@ -20,6 +20,7 @@ import { COMPANY_CONTEXT } from '../../lib/companyContext';
 import { getStructureTree, structureToText } from '../../lib/structure';
 import { executeStructureTool, STRUCTURE_TOOL_DEFINITION } from '../../lib/structureTools';
 import { executeRuleTool, RULE_TOOL_DEFINITION } from '../../lib/ruleTools';
+import { executeSlideTool, SLIDE_TOOL_DEFINITION } from '../../lib/slideTools';
 
 function truncateList(arr, max = 5) {
   if (!arr || arr.length === 0) return '—';
@@ -58,21 +59,29 @@ async function callClaude(systemPrompt, messages) {
       model: 'claude-sonnet-4-6',
       max_tokens: 2000,
       system: systemPrompt,
-      tools: [STRUCTURE_TOOL_DEFINITION, RULE_TOOL_DEFINITION],
+      tools: [STRUCTURE_TOOL_DEFINITION, RULE_TOOL_DEFINITION, SLIDE_TOOL_DEFINITION],
       messages,
     }),
   });
   return res.json();
 }
 
+// Returns { forClaude, attachment? } uniformly. Tools that don't produce a
+// file (structure/rule changes) just get wrapped so the caller doesn't need
+// to special-case them.
 async function routeToolCall(toolUseBlock) {
   if (toolUseBlock.name === 'update_org_structure') {
-    return executeStructureTool(toolUseBlock.input);
+    const result = await executeStructureTool(toolUseBlock.input);
+    return { forClaude: result };
   }
   if (toolUseBlock.name === 'manage_review_rule') {
-    return executeRuleTool(toolUseBlock.input);
+    const result = await executeRuleTool(toolUseBlock.input);
+    return { forClaude: result };
   }
-  return { ok: false, message: `Unknown tool "${toolUseBlock.name}".` };
+  if (toolUseBlock.name === 'generate_slides') {
+    return executeSlideTool(toolUseBlock.input); // already returns { forClaude, attachment }
+  }
+  return { forClaude: { ok: false, message: `Unknown tool "${toolUseBlock.name}".` } };
 }
 
 export default async function handler(req, res) {
@@ -139,7 +148,13 @@ TOOLS
   call update_org_structure — actually call it, don't just say you will.
 - If they explicitly ask you to remember/save a rule for future reviews, or
   to stop applying one, call manage_review_rule — actually call it.
-- Do not call either tool for hypothetical questions or general discussion.
+- If anyone asks you to prepare, create, or generate a slide deck, presentation,
+  or PowerPoint, call generate_slides — you CAN produce a real, downloadable
+  .pptx file this way. Never say you're unable to create slides or that you
+  lack a slide/file-generation capability — you have one, use it. Write the
+  actual content of the slides yourself (real findings, not placeholders)
+  as the tool's input.
+- Do not call any tool for hypothetical questions or general discussion.
 
 IMPORTANT — CONVERSATION HANDLING
 - There is NO way for the user to attach a file inline in this chat — file
@@ -169,10 +184,12 @@ ${formatSubmissions(submissions || [])}
     let data = await callClaude(systemPrompt, conversation);
 
     let guard = 0;
+    let attachment = null; // set if a tool (e.g. generate_slides) produces a downloadable file
     while (data.stop_reason === 'tool_use' && guard < 3) {
       guard++;
       const toolUseBlock = data.content.find((b) => b.type === 'tool_use');
-      const result = await routeToolCall(toolUseBlock);
+      const { forClaude, attachment: toolAttachment } = await routeToolCall(toolUseBlock);
+      if (toolAttachment) attachment = toolAttachment;
 
       conversation = [
         ...conversation,
@@ -180,7 +197,7 @@ ${formatSubmissions(submissions || [])}
         {
           role: 'user',
           content: [
-            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(result) },
+            { type: 'tool_result', tool_use_id: toolUseBlock.id, content: JSON.stringify(forClaude) },
           ],
         },
       ];
@@ -193,7 +210,7 @@ ${formatSubmissions(submissions || [])}
 
     await supabase.from('chat_messages').insert({ role: 'assistant', content: replyText });
 
-    return res.status(200).json({ reply: replyText });
+    return res.status(200).json({ reply: replyText, attachment });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
