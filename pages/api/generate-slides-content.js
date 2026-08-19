@@ -1,9 +1,10 @@
 // pages/api/generate-slides-content.js
 //
-// Now 5 parts, each disciplined to produce ONE SLIDE PER TOPIC (one overlap
-// = one slide, one gap = one slide, etc.) instead of cramming everything
-// into a single crowded slide. Smaller, focused parts also means each call
-// finishes faster and more reliably.
+// Rebalanced: SUMMARY TABLES covering every finding (not one slide per
+// item), a real chart for the executive summary, and only a handful of
+// deep-dive slides for the most critical 2-3 items overall — matching how
+// a real consultant deck is actually built, and keeping total slide count
+// sane (aiming for ~15-20 slides, not 60+).
 
 export const config = {
   maxDuration: 280,
@@ -12,66 +13,92 @@ export const config = {
 import { getReviewContext } from '../../lib/reviewContext';
 
 const NO_PART_LEAK_RULE = `
-IMPORTANT: this deck is being generated in several separate pieces behind
-the scenes, but the person reading the final deck will NEVER know that —
-they see one single, seamless presentation. NEVER write "Part 1", "Part 2",
-"continued", "as covered earlier", or any reference to this being generated
-in pieces, anywhere in deck_title, subtitle, headings, or bullets.
+IMPORTANT: this deck is generated in pieces behind the scenes, but the
+reader sees one seamless deck. NEVER write "Part 1", "Part 2", "continued",
+or reference this being generated in pieces, anywhere in any output.
+`.trim();
+
+const SLIDE_TYPE_RULES = `
+SLIDE TYPES — use the right one:
+- "chart": for the executive summary counts ONLY. Fields: heading,
+  chartType ("bar" or "pie"), seriesName, labels (array of category names),
+  values (array of numbers, same length as labels).
+- "table": for ANY list of multiple findings (all overlaps, all gaps, all
+  ambiguities, all structure issues, all division recommendations). Fields:
+  heading, columns (array of column header strings), rows (array of arrays
+  of cell text, one inner array per row). Put severity words like "High",
+  "Critical", "Medium", "Low", "Resolved" as their own cell so they get
+  color-coded automatically. Keep cell text SHORT — a phrase, not a
+  paragraph.
+- "bullets": ONLY for the small number of deep-dive slides on the single
+  most critical items. Fields: heading, bullets (array of short strings).
+
+CRITICAL RULE: do NOT create one "bullets" slide per individual finding.
+Every overlap, gap, ambiguity, and structure issue goes into ONE table
+slide per category (all rows in one table). Only the 2-3 most severe items
+ACROSS THE WHOLE REVIEW get their own individual "bullets" deep-dive slide.
 `.trim();
 
 const SCOPES = {
   1: `
-Produce exactly 3 slides, in this order:
-1. "How to Read This Deck" — methodology and severity scale
-2. "Approved Structure — As Reviewed" — the structure snapshot
-3. "Executive Summary" — findings at a glance, all categories, as counts
-Also set deck_title and subtitle for the WHOLE deck (this is the only part
-that sets these) — a clean, professional title and subtitle with no
-reference to "findings," "part," or anything implying this is one section
-of several. Just the deck's real title, e.g. "BDC Organizational Design
-Review" and a subtitle like "Functional Review — Gaps, Overlaps &
-Recommendations".
+Produce exactly these slides:
+1. type "chart" — "Executive Summary at a Glance": bar chart with labels
+   ["Overlaps","Gaps","Ambiguities","Structure Issues"] and values = the
+   count found in each category.
+2. type "bullets" — "How to Read This Deck": brief methodology and
+   severity scale (concise, 5-6 bullets max).
+3. type "table" — "Approved Structure — As Reviewed": columns
+   ["Division","Reporting Line / Key Departments"], one row per division.
+Also set deck_title and subtitle for the WHOLE deck — clean and
+professional, e.g. "BDC Organizational Design Review" / "Functional Review
+— Findings & Recommendations". No "part" language anywhere.
 `.trim(),
   2: `
-Produce ONE SLIDE PER OVERLAP found — do not bundle multiple overlaps onto
-one slide. Each slide heading should name the overlap (e.g. "Overlap:
-Corporate Brand & Narrative Ownership"), and bullets should cover: which
-functions are in conflict, what each claims, the risk, and the recommended
-resolution — kept concise (aim for 4-6 bullets per slide, not long
-paragraphs). If there are 9 overlaps, produce 9 separate slides.
+Produce exactly these slides:
+1. type "table" — "Overlaps — All Findings": columns ["#","Overlap",
+   "Functions in Conflict","Severity"], one row per overlap found (ALL of
+   them, in one table).
+2. type "table" — "Gaps — All Findings": columns ["#","Gap","Severity",
+   "Closest Current Owner"], one row per gap found (ALL of them, one table).
+3-4. type "bullets" — deep-dive slides for ONLY the 2 single most critical
+   items across overlaps AND gaps combined (pick the most severe/impactful
+   ones). Each: what it is, why it matters, recommended resolution.
 `.trim(),
   3: `
-Produce ONE SLIDE PER GAP found — do not bundle multiple gaps onto one
-slide. Each slide heading should name the gap, and bullets should cover:
-what's missing, why it matters for BDC specifically, and the action
-required — kept concise (4-6 bullets per slide). If there are 6 gaps,
-produce 6 separate slides.
+Produce exactly these slides:
+1. type "table" — "Ownership Ambiguities — All Findings": columns
+   ["#","Ambiguity","Functions Affected","Severity"], one row per
+   ambiguity (ALL of them, one table).
+2. type "table" — "Structure Issues — All Findings": columns
+   ["#","Issue","Function/Unit","Severity"], one row per issue (ALL of
+   them, one table).
+3. type "bullets" — ONE deep-dive slide for the single most critical
+   ambiguity or structure issue.
 `.trim(),
   4: `
-Produce ONE SLIDE PER OWNERSHIP AMBIGUITY, then ONE SLIDE PER STRUCTURE
-ISSUE found — do not bundle multiple items onto one slide. Concise bullets
-(4-6 per slide), not long paragraphs.
-`.trim(),
-  5: `
-Produce ONE SLIDE PER DIVISION that has at least one loaded function
-submission — a functional statement / mandate recommendation for each.
-Each slide: current mandate weakness (1-2 bullets), recommended rewritten
-mandate (1-2 bullets). Keep every division's slide concise so it stays
-readable — do not write long paragraphs.
+Produce exactly these slides:
+1. type "table" — "Division Mandate Recommendations": columns
+   ["Division","Current Weakness","Recommended Mandate Direction"], one row
+   per division that has at least one loaded submission (ALL divisions in
+   ONE table — keep each cell to a short phrase, not a paragraph).
+2. type "bullets" — "Next Steps & Priorities": 5-8 concise, sequenced
+   recommended actions to close this review out.
 `.trim(),
 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
   const { part } = req.body;
-  if (![1, 2, 3, 4, 5].includes(part)) return res.status(400).json({ error: 'part must be 1-5' });
+  if (![1, 2, 3, 4].includes(part)) return res.status(400).json({ error: 'part must be 1-4' });
 
   try {
     const { companyContext, structureText, rulesBlock, submissionsText, submissionCount } = await getReviewContext();
 
     const prompt = `
-You are a senior Organizational Design consultant preparing an executive
-presentation for BDC's CEO and Executive Leadership.
+You are a senior Organizational Design consultant preparing a CONCISE
+executive presentation for BDC's CEO and Executive Leadership — this needs
+to be presentable in one meeting, not an exhaustive document. Aim for
+clarity and brevity over exhaustive coverage.
 
 ${companyContext}
 
@@ -86,13 +113,12 @@ ${submissionsText}
 
 ${NO_PART_LEAK_RULE}
 
+${SLIDE_TYPE_RULES}
+
 ${SCOPES[part]}
 
 Return ONLY valid JSON, no preamble, no markdown fences, in this exact shape:
-${part === 1 ? '{ "deck_title": string, "subtitle": string, "slides": [ { "heading": string, "bullets": string[] } ] }' : '{ "slides": [ { "heading": string, "bullets": string[] } ] }'}
-
-Write real, specific content — this deck will be presented as-is. Keep
-bullets concise so each slide is actually readable when projected.
+${part === 1 ? '{ "deck_title": string, "subtitle": string, "slides": [ ...slide objects as described above... ] }' : '{ "slides": [ ...slide objects as described above... ] }'}
 `.trim();
 
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -104,7 +130,7 @@ bullets concise so each slide is actually readable when projected.
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 8000,
+        max_tokens: 6000,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -119,9 +145,7 @@ bullets concise so each slide is actually readable when projected.
     try {
       parsed = JSON.parse(cleaned);
     } catch (parseErr) {
-      return res.status(500).json({
-        error: `Part ${part}'s response was cut off before finishing. Try again.`,
-      });
+      return res.status(500).json({ error: `Part ${part}'s response was cut off before finishing. Try again.` });
     }
 
     return res.status(200).json(parsed);
