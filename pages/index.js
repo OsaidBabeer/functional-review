@@ -255,7 +255,7 @@ function ReviewTab() {
           return data;
         });
 
-      const parts = await Promise.all([1, 2, 3, 4, 5].map(fetchPart));
+      const parts = await Promise.all([1, 2, 3, 4].map(fetchPart));
 
       setUploadStatus('Building the file...');
       const { buildPptx } = await import('../lib/slideTools');
