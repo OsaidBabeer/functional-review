@@ -47,7 +47,15 @@ KPIs: ${truncateList(s.kpis, 4)}
     .join('\n\n');
 }
 
-async function callClaude(systemPrompt, messages) {
+async function callClaude(systemPrompt, messages, includeTools = true) {
+  const body = {
+    model: 'claude-sonnet-4-6',
+    max_tokens: 2000,
+    system: systemPrompt,
+    messages,
+  };
+  if (includeTools) body.tools = [STRUCTURE_TOOL_DEFINITION, RULE_TOOL_DEFINITION, SLIDE_TOOL_DEFINITION];
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -55,13 +63,7 @@ async function callClaude(systemPrompt, messages) {
       'anthropic-version': '2023-06-01',
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
-      system: systemPrompt,
-      tools: [STRUCTURE_TOOL_DEFINITION, RULE_TOOL_DEFINITION, SLIDE_TOOL_DEFINITION],
-      messages,
-    }),
+    body: JSON.stringify(body),
   });
   return res.json();
 }
@@ -153,7 +155,9 @@ TOOLS
   .pptx file this way. Never say you're unable to create slides or that you
   lack a slide/file-generation capability — you have one, use it. Write the
   actual content of the slides yourself (real findings, not placeholders)
-  as the tool's input.
+  as the tool's input. Call it EXACTLY ONCE and put ALL requested content
+  into that one call — one complete deck, never split across multiple calls
+  or multiple files.
 - Do not call any tool for hypothetical questions or general discussion.
 
 IMPORTANT — CONVERSATION HANDLING
@@ -185,7 +189,7 @@ ${formatSubmissions(submissions || [])}
 
     let guard = 0;
     let attachment = null; // set if a tool (e.g. generate_slides) produces a downloadable file
-    while (data.stop_reason === 'tool_use' && guard < 3) {
+    while (data.stop_reason === 'tool_use' && guard < 5) {
       guard++;
       const toolUseBlock = data.content.find((b) => b.type === 'tool_use');
       const { forClaude, attachment: toolAttachment } = await routeToolCall(toolUseBlock);
@@ -205,7 +209,17 @@ ${formatSubmissions(submissions || [])}
       data = await callClaude(systemPrompt, conversation);
     }
 
-    const textBlock = data.content?.find((b) => b.type === 'text');
+    let textBlock = data.content?.find((b) => b.type === 'text');
+
+    // Safety net: if the loop ran out of attempts while Claude was still
+    // trying to call a tool, force one final call WITHOUT tools available —
+    // it has no choice but to respond in plain text at that point, so the
+    // user always gets a real reply instead of nothing.
+    if (!textBlock) {
+      data = await callClaude(systemPrompt, conversation, false);
+      textBlock = data.content?.find((b) => b.type === 'text');
+    }
+
     const replyText = textBlock ? textBlock.text : '(No text reply — check logs.)';
 
     await supabase.from('chat_messages').insert({ role: 'assistant', content: replyText });
