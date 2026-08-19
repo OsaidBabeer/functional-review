@@ -242,30 +242,25 @@ function ReviewTab() {
   async function downloadSlides() {
     setGeneratingSlides(true);
     try {
-      setUploadStatus('Writing slides (part 1 of 2)...');
-      const res1 = await fetch('/api/generate-slides-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ part: 1 }),
-      });
-      const part1 = await res1.json();
-      if (!res1.ok) throw new Error(part1.error || 'Part 1 failed');
-
-      setUploadStatus('Writing slides (part 2 of 2)...');
-      const res2 = await fetch('/api/generate-slides-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ part: 2 }),
-      });
-      const part2 = await res2.json();
-      if (!res2.ok) throw new Error(part2.error || 'Part 2 failed');
+      const parts = [];
+      for (const partNum of [1, 2, 3]) {
+        setUploadStatus(`Writing slides (part ${partNum} of 3)...`);
+        const res = await fetch('/api/generate-slides-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ part: partNum }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Part ${partNum} failed`);
+        parts.push(data);
+      }
 
       setUploadStatus('Building the file...');
       const { buildPptx } = await import('../lib/slideTools');
       const { base64, filename, mimeType } = await buildPptx({
-        deck_title: part1.deck_title,
-        subtitle: part1.subtitle,
-        slides: [...(part1.slides || []), ...(part2.slides || [])],
+        deck_title: parts[0].deck_title,
+        subtitle: parts[0].subtitle,
+        slides: parts.flatMap((p) => p.slides || []),
       });
 
       const link = document.createElement('a');
