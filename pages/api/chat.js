@@ -50,7 +50,7 @@ KPIs: ${truncateList(s.kpis, 4)}
 async function callClaude(systemPrompt, messages, includeTools = true) {
   const body = {
     model: 'claude-sonnet-4-6',
-    max_tokens: 2000,
+    max_tokens: 16000,
     system: systemPrompt,
     messages,
   };
