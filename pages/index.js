@@ -241,21 +241,40 @@ function ReviewTab() {
 
   async function downloadSlides() {
     setGeneratingSlides(true);
-    setUploadStatus('Preparing your slide deck — this can take a minute for a thorough deck...');
     try {
-      const res = await fetch('/api/generate-slides', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        setUploadStatus('Error generating slides: ' + data.error);
-      } else {
-        const link = document.createElement('a');
-        link.href = `data:${data.mimeType};base64,${data.base64}`;
-        link.download = data.filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setUploadStatus(`Downloaded ${data.filename}`);
-      }
+      setUploadStatus('Writing slides (part 1 of 2)...');
+      const res1 = await fetch('/api/generate-slides-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ part: 1 }),
+      });
+      const part1 = await res1.json();
+      if (!res1.ok) throw new Error(part1.error || 'Part 1 failed');
+
+      setUploadStatus('Writing slides (part 2 of 2)...');
+      const res2 = await fetch('/api/generate-slides-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ part: 2 }),
+      });
+      const part2 = await res2.json();
+      if (!res2.ok) throw new Error(part2.error || 'Part 2 failed');
+
+      setUploadStatus('Building the file...');
+      const { buildPptx } = await import('../lib/slideTools');
+      const { base64, filename, mimeType } = await buildPptx({
+        deck_title: part1.deck_title,
+        subtitle: part1.subtitle,
+        slides: [...(part1.slides || []), ...(part2.slides || [])],
+      });
+
+      const link = document.createElement('a');
+      link.href = `data:${mimeType};base64,${base64}`;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setUploadStatus(`Downloaded ${filename}`);
     } catch (err) {
       setUploadStatus('Error: ' + err.message);
     }
