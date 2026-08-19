@@ -237,6 +237,31 @@ function ReviewTab() {
   // out of every slide, in order — same technique the old server route
   // used, just running here instead so the file itself never has to be
   // uploaded whole. Only the extracted text (tiny) gets sent to the server.
+  const [generatingSlides, setGeneratingSlides] = useState(false);
+
+  async function downloadSlides() {
+    setGeneratingSlides(true);
+    setUploadStatus('Preparing your slide deck — this can take a minute for a thorough deck...');
+    try {
+      const res = await fetch('/api/generate-slides', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadStatus('Error generating slides: ' + data.error);
+      } else {
+        const link = document.createElement('a');
+        link.href = `data:${data.mimeType};base64,${data.base64}`;
+        link.download = data.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setUploadStatus(`Downloaded ${data.filename}`);
+      }
+    } catch (err) {
+      setUploadStatus('Error: ' + err.message);
+    }
+    setGeneratingSlides(false);
+  }
+
   async function extractSlidesFromPptx(file) {
     const zip = await JSZip.loadAsync(file);
     const slideFiles = Object.keys(zip.files)
@@ -303,6 +328,9 @@ function ReviewTab() {
         <input type="file" accept=".pptx" ref={fileRef} onChange={handleUpload} style={{ display: 'none' }} />
         <button style={{ ...s.uploadBtn, opacity: uploading ? 0.6 : 1 }} onClick={() => fileRef.current.click()} disabled={uploading}>
           {uploading ? 'Reading…' : '+ Upload Submission'}
+        </button>
+        <button style={{ ...s.slidesBtn, opacity: generatingSlides ? 0.6 : 1 }} onClick={downloadSlides} disabled={generatingSlides}>
+          {generatingSlides ? 'Building deck…' : '⬇ Download Slides (PPT)'}
         </button>
         {uploadStatus && <span style={s.uploadStatusInline}>{uploadStatus}</span>}
       </div>
@@ -573,6 +601,7 @@ const s = {
 
   uploadRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px clamp(14px, 4vw, 28px)', background: '#fff', borderBottom: `1px solid ${line}` },
   uploadBtn: { background: brick, color: '#fff', border: 'none', borderRadius: 6, padding: '9px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
+  slidesBtn: { background: olive, color: '#fff', border: 'none', borderRadius: 6, padding: '9px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" },
   uploadStatusInline: { fontSize: 12.5, color: olive },
 
   chatArea: { flex: 1, overflowY: 'auto', padding: 'clamp(14px, 4vw, 20px) clamp(14px, 4vw, 28px)', display: 'flex', flexDirection: 'column', gap: 16 },
