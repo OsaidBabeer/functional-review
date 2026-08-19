@@ -164,7 +164,7 @@ function ReviewTab() {
         return finalMessages;
       }
 
-      finalMessages = [...newMessages, { role: 'assistant', content: data.reply || data.error || 'Something went wrong with no error message.' }];
+      finalMessages = [...newMessages, { role: 'assistant', content: data.reply || data.error || 'Something went wrong with no error message.', attachment: data.attachment || null }];
       setMessages(finalMessages);
     } catch (err) {
       clearTimeout(timeoutId);
@@ -278,6 +278,15 @@ function ReviewTab() {
             {m.role === 'assistant' && <div style={s.avatar}>OD</div>}
             <div style={m.role === 'user' ? s.userBubble : s.assistantBubble}>
               <MarkdownMessage content={m.content} />
+              {m.attachment && (
+                <a
+                  href={`data:${m.attachment.mimeType};base64,${m.attachment.base64}`}
+                  download={m.attachment.filename}
+                  style={s.attachmentBtn}
+                >
+                  ⬇ Download {m.attachment.filename}
+                </a>
+              )}
             </div>
           </div>
         ))}
@@ -575,6 +584,7 @@ const s = {
   mdTd: { border: `1px solid ${line}`, padding: '7px 10px', verticalAlign: 'top' },
   mdLink: { color: brick, textDecoration: 'underline' },
   mdCode: { background: parch, border: `1px solid ${line}`, borderRadius: 4, padding: '1px 5px', fontSize: 13, fontFamily: 'monospace' },
+  attachmentBtn: { display: 'inline-block', marginTop: 10, background: brick, color: '#fff', padding: '8px 14px', borderRadius: 6, fontSize: 13, fontWeight: 500, textDecoration: 'none' },
 
   functionsArea: { flex: 1, overflowY: 'auto', padding: 'clamp(16px, 5vw, 28px)' },
   functionsList: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 560 },
