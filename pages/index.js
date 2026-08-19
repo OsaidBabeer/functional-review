@@ -183,13 +183,48 @@ function ReviewTab() {
   }
 
   async function runFullReview() {
+    setSending(true);
+    try {
+      const checkRes = await fetch('/api/full-review-check');
+      const check = await checkRes.json();
+
+      if (check.fresh) {
+        const cachedAt = new Date(check.cachedAt).toLocaleString();
+        setMessages((prev) => [
+          ...prev,
+          { role: 'user', content: 'Give me a full review of every function currently loaded.' },
+          {
+            role: 'assistant',
+            content: `Nothing has changed since the last full review (run on ${cachedAt}), so here it is again — no need to redo the analysis:\n\n${check.cachedText}`,
+          },
+        ]);
+        setSending(false);
+        return;
+      }
+    } catch (err) {
+      // If the freshness check itself fails, just fall through and run normally.
+    }
+    setSending(false);
+
     const afterPart1 = await sendMessage(
       'Part 1 of the full review — cover ONLY overlaps and gaps across every function currently loaded. Be thorough on these two categories specifically; ambiguities and structure issues will be covered in a follow-up.'
     );
-    await sendMessage(
+    const afterPart2 = await sendMessage(
       'Part 2 of the full review — now cover ONLY ownership ambiguities and structure issues across every function currently loaded, following on from the overlaps and gaps you just covered.',
       afterPart1
     );
+
+    // Cache the combined result so the next identical request is instant,
+    // as long as nothing's changed in the meantime.
+    const part1Text = afterPart1[afterPart1.length - 1]?.content || '';
+    const part2Text = afterPart2[afterPart2.length - 1]?.content || '';
+    if (part1Text && part2Text) {
+      fetch('/api/save-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ findings: `${part1Text}\n\n---\n\n${part2Text}` }),
+      }).catch(() => {});
+    }
   }
 
   async function clearConversation() {
